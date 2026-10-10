@@ -1,0 +1,16 @@
+{
+  "name": "betterai",
+  "description": "Portable fixes for AI assistants",
+  "owner": {
+    "name": "WH1T3K1NG"
+  },
+  "plugins": [
+    {
+      "name": "precise-edit",
+      "source": "./plugins/precise-edit",
+      "description": "Make agents use exact-match edits (Edit / str_replace / apply_patch) and block whole-file rewrites of existing files",
+      "version": "1.0.0",
+      "keywords": ["edit", "str_replace", "apply_patch", "hooks", "guardrail"]
+    }
+  ]
+}

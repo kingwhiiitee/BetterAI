@@ -1,0 +1,12 @@
+{
+  "name": "precise-edit",
+  "version": "1.0.0",
+  "description": "Stop AI agents from rewriting whole files: a skill that teaches exact-match edits plus a hook that blocks Write/sed -i/redirect/Set-Content rewrites of existing files.",
+  "author": {
+    "name": "WH1T3K1NG"
+  },
+  "homepage": "https://github.com/kingwhiiitee/BetterAI",
+  "repository": "https://github.com/kingwhiiitee/BetterAI",
+  "license": "MIT",
+  "keywords": ["edit", "str_replace", "apply_patch", "hooks", "guardrail", "file-editing"]
+}

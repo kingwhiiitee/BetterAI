@@ -1,0 +1,29 @@
+# precise-edit (BetterAI): Codex execpolicy rules.
+# Install to ~/.codex/rules/precise-edit.rules, then restart Codex.
+# In-place stream editors rewrite whole files blindly; edits go through apply_patch.
+# Rules match argv prefixes only, so variants such as `sed -E -i` are left to the
+# precise-edit PreToolUse hook.
+
+prefix_rule(
+    pattern = [["sed", "gsed"], ["-i", "-i.bak", "-i.orig", "-ie", "-Ei", "-ri", "-ni", "--in-place"]],
+    decision = "forbidden",
+    justification = "sed -i rewrites files in place. Use apply_patch with an '*** Update File:' hunk instead.",
+    match = [["sed", "-i", "s/a/b/", "file.txt"], ["gsed", "-Ei", "s/a/b/", "file.txt"]],
+    not_match = [["sed", "-n", "1,20p", "file.txt"], ["sed", "s/a/b/", "file.txt"]],
+)
+
+prefix_rule(
+    pattern = [["perl", "ruby"], ["-i", "-pi", "-pie", "-i.bak", "-pi.bak", "-0pi", "-0777pi", "-lpi", "-ni"]],
+    decision = "forbidden",
+    justification = "perl/ruby -i rewrites files in place. Use apply_patch with an '*** Update File:' hunk instead.",
+    match = [["perl", "-pi", "-e", "s/a/b/", "file.txt"]],
+    not_match = [["perl", "-ne", "print", "file.txt"]],
+)
+
+prefix_rule(
+    pattern = [["awk", "gawk"], "-i", "inplace"],
+    decision = "forbidden",
+    justification = "awk -i inplace rewrites files in place. Use apply_patch with an '*** Update File:' hunk instead.",
+    match = [["gawk", "-i", "inplace", "{print}", "file.txt"]],
+    not_match = [["awk", "{print $1}", "file.txt"]],
+)

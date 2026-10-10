@@ -1,0 +1,23 @@
+{
+  "name": "betterai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portable fixes for AI assistants. precise-edit: make Claude, Claude Code, Codex and ChatGPT use exact-match edits instead of rewriting whole files.",
+  "type": "module",
+  "license": "MIT",
+  "author": "WH1T3K1NG",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kingwhiiitee/BetterAI.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "build": "node scripts/build.mjs",
+    "install:codex": "node scripts/install.mjs --codex",
+    "install:claude-code": "node scripts/install.mjs --claude-code",
+    "uninstall:all": "node scripts/install.mjs --all --uninstall"
+  }
+}
