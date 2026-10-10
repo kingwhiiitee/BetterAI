@@ -48,6 +48,47 @@ Chat products do not run user hooks, so there the fix is guidance only. It still
 
 The guard hook needs **Node.js 18+** on `PATH`. The skill and instructions work without it.
 
+#### Let an AI install it (universal prompt)
+
+Copy the prompt below into any AI tool: Claude Code, Codex, Claude Cowork, Claude.ai, ChatGPT, Cursor, Gemini CLI and so on. The AI works out which tool it is running in and installs the matching version. If it can't install anything itself (for example in plain chat), it gives you the manual steps. It shows you every configuration change and waits for your OK before applying it.
+
+```text
+Install the "precise-edit" fix from https://github.com/kingwhiiitee/BetterAI for the AI tool you are running in right now. It makes AI agents change existing files with exact-match edits (Edit / str_replace / apply_patch) instead of rewriting whole files.
+
+Rules:
+- Only use files from github.com/kingwhiiitee/BetterAI (releases: https://github.com/kingwhiiitee/BetterAI/releases/latest).
+- Before changing any configuration outside the repository, show me the exact commands or file changes and wait for my confirmation.
+- Do not use sudo or administrator rights. Requirements: git and Node.js 18+ (check with `node --version`). If Node.js is missing, tell me before continuing.
+
+First identify which tool you are running in, then follow only the matching section.
+
+A. Claude Code (you can run shell commands and the `claude` CLI is available):
+   1. Run `claude plugin marketplace add kingwhiiitee/BetterAI`.
+   2. Run `claude plugin install precise-edit@betterai`.
+   3. Run `claude plugin list` and confirm precise-edit@betterai is enabled. Then tell me to start a new session.
+
+B. Codex (CLI, IDE extension or app):
+   1. Clone the repository into <home>/.betterai/BetterAI, or run `git pull --ff-only` there if it already exists.
+   2. In that folder run `node --test`. All tests must pass.
+   3. Run `node scripts/install.mjs --codex --dry-run` and show me the output. After I confirm, run it again without `--dry-run`.
+   4. Tell me to restart Codex, run /hooks and trust the "precise-edit" hook, because Codex skips untrusted hooks.
+
+C. Claude Cowork:
+   Download https://github.com/kingwhiiitee/BetterAI/releases/latest/download/precise-edit.plugin, save it to the outputs folder and present it to me so I can accept the plugin card. If you cannot download it, give me the link instead.
+
+D. Chat without a shell (Claude.ai, ChatGPT):
+   You cannot install it yourself, so give me these steps:
+   - Claude.ai: download https://github.com/kingwhiiitee/BetterAI/releases/latest/download/precise-edit-skill.zip, then go to Settings → Capabilities → Skills → Upload skill.
+   - ChatGPT Work / Business / Enterprise / Edu: upload the same zip via Skills → Create → Upload from your computer.
+   - Any plan: paste the instruction block from https://github.com/kingwhiiitee/BetterAI/blob/main/platforms/chatgpt/custom-instructions.md (ChatGPT) or https://github.com/kingwhiiitee/BetterAI/blob/main/platforms/claude-ai/instructions.md (Claude.ai) into custom instructions / personal preferences.
+   Then follow that editing rule yourself for the rest of this conversation.
+
+E. Any other coding agent (Cursor, Gemini CLI, Windsurf, Cline, ...):
+   Clone the repository as in B. If the agent supports Agent Skills, copy plugins/precise-edit/skills/precise-edit into its skills folder. Otherwise append the policy block from platforms/codex/AGENTS.md to its global rules file (for example AGENTS.md, GEMINI.md or .cursor/rules). Show me the target path before writing.
+
+Finish with a short report: what you installed, where, and anything I still have to do by hand.
+```
+
 #### Claude Code (plugin, recommended)
 
 Inside Claude Code:
@@ -209,6 +250,47 @@ New fixes are welcome and follow the same shape: one portable skill, an optional
 ### 安装
 
 Guard hook 需要 `PATH` 中有 **Node.js 18+**;skill 和指令不依赖 Node。
+
+#### 让 AI 帮你安装(通用提示词)
+
+把下面这段提示词复制给任意 AI 工具即可:Claude Code、Codex、Claude Cowork、Claude.ai、ChatGPT、Cursor、Gemini CLI 等都可以。AI 会先判断自己运行在哪个工具里,然后安装对应的版本。如果它自己无法安装(比如纯对话环境),就会把手动步骤告诉你。每一处配置改动它都会先展示给你,等你确认后才执行。
+
+```text
+请为你当前所在的 AI 工具安装 https://github.com/kingwhiiitee/BetterAI 中的 "precise-edit" 修复。它让 AI 代理用精确匹配的编辑(Edit / str_replace / apply_patch)修改已有文件,而不是整文件重写。
+
+规则:
+- 只使用来自 github.com/kingwhiiitee/BetterAI 的文件(发布页:https://github.com/kingwhiiitee/BetterAI/releases/latest)。
+- 修改仓库以外的任何配置之前,先把具体命令或文件改动展示给我,等我确认后再执行。
+- 不要使用 sudo 或管理员权限。需要 git 和 Node.js 18+(用 `node --version` 检查);如果没有 Node.js,先告诉我再继续。
+
+先判断你运行在哪个工具里,然后只执行对应的那一节。
+
+A. Claude Code(你能执行 shell 命令,并且有 `claude` 命令行):
+   1. 运行 `claude plugin marketplace add kingwhiiitee/BetterAI`。
+   2. 运行 `claude plugin install precise-edit@betterai`。
+   3. 运行 `claude plugin list`,确认 precise-edit@betterai 已启用,然后提醒我开启一个新会话。
+
+B. Codex(CLI、IDE 扩展或桌面端):
+   1. 把仓库克隆到 <用户主目录>/.betterai/BetterAI;如果已经存在,就在该目录运行 `git pull --ff-only`。
+   2. 在该目录运行 `node --test`,所有测试必须通过。
+   3. 运行 `node scripts/install.mjs --codex --dry-run` 并把输出展示给我。我确认后,去掉 `--dry-run` 再运行一次。
+   4. 提醒我重启 Codex,运行 /hooks 并信任(trust)"precise-edit" hook,因为 Codex 会跳过未被信任的 hook。
+
+C. Claude Cowork:
+   下载 https://github.com/kingwhiiitee/BetterAI/releases/latest/download/precise-edit.plugin,保存到 outputs 文件夹并展示给我,让我在插件卡片上确认安装。如果无法下载,就把链接给我。
+
+D. 没有 shell 的对话环境(Claude.ai、ChatGPT):
+   你无法自己安装,请把以下步骤告诉我:
+   - Claude.ai:下载 https://github.com/kingwhiiitee/BetterAI/releases/latest/download/precise-edit-skill.zip,然后进入 设置 → Capabilities → Skills → Upload skill。
+   - ChatGPT Work / Business / Enterprise / Edu:通过 Skills → Create → Upload from your computer 上传同一个 zip。
+   - 任意套餐:把 https://github.com/kingwhiiitee/BetterAI/blob/main/platforms/chatgpt/custom-instructions.md(ChatGPT)或 https://github.com/kingwhiiitee/BetterAI/blob/main/platforms/claude-ai/instructions.md(Claude.ai)中的指令粘贴到自定义指令 / 个人偏好里。
+   然后在本次对话的剩余部分里,你自己也要遵守这条编辑规则。
+
+E. 其他编程代理(Cursor、Gemini CLI、Windsurf、Cline 等):
+   按 B 的方式克隆仓库。如果该代理支持 Agent Skills,把 plugins/precise-edit/skills/precise-edit 复制到它的 skills 目录;否则把 platforms/codex/AGENTS.md 中的规则块追加到它的全局规则文件(例如 AGENTS.md、GEMINI.md 或 .cursor/rules)。写入前先告诉我目标路径。
+
+最后给我一份简短报告:装了什么、装在哪里,以及还有哪些需要我手动完成的步骤。
+```
 
 #### Claude Code(插件,推荐)
 
