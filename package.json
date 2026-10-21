@@ -2,7 +2,7 @@
   "name": "betterai",
   "version": "1.0.0",
   "private": true,
-  "description": "Portable fixes for AI assistants. precise-edit: make Claude, Claude Code, Codex and ChatGPT use exact-match edits instead of rewriting whole files.",
+  "description": "Portable fixes for AI assistants. precise-edit: make Claude, Claude Code, Codex and ChatGPT use exact-match edits instead of rewriting whole files. LaTeX Fix: make ChatGPT formulas render and copy correctly.",
   "type": "module",
   "license": "MIT",
   "author": "WH1T3K1NG",
