@@ -198,9 +198,18 @@ plugins/precise-edit/             the plugin (single source of truth)
   scripts/guard.mjs               the guard, shared by Claude Code and Codex
 platforms/                        paste-ready instructions per platform + Codex rules
 scripts/install.mjs               installer for Codex and Claude Code (manual mode)
-scripts/build.mjs                 builds dist/precise-edit-skill.zip and dist/precise-edit.plugin
+scripts/build.mjs                 builds the upload packages into dist/ (precise-edit and LaTeX Fix)
+Latex Fix/                        Fix #2: ChatGPT LaTeX rule, skill, userscript, converter
 tests/                            node:test suite (Linux, macOS, Windows in CI)
 ```
+
+### Fix #2: LaTeX Fix makes ChatGPT's formulas render and copy correctly
+
+**The problem.** ChatGPT's formulas sometimes render wrong (raw `\[ \]`, bare `[ ]` / `( )`, red errors), and their LaTeX can't be copied, especially in the desktop and mobile apps.
+
+**The fix.** One rule for your custom instructions. It limits the model to delimiters and commands ChatGPT renders, and makes every answer with formulas end with a copyable `latex` source block. Custom instructions live in your account, so the rule works on the web, in the desktop apps and in the iOS / Android apps. Optional extras: a skill, a chatgpt.com userscript and a converter page for pasting into Obsidian / Typora / Notion.
+
+Everything is in [`Latex Fix/`](Latex%20Fix/). Start with [`Latex Fix/chatgpt/custom-instructions.md`](Latex%20Fix/chatgpt/custom-instructions.md).
 
 ### Uninstall
 
@@ -401,9 +410,18 @@ plugins/precise-edit/             插件本体(唯一的源文件)
   scripts/guard.mjs               guard 脚本,Claude Code 与 Codex 共用
 platforms/                        各平台可直接粘贴的指令 + Codex 规则
 scripts/install.mjs               Codex / Claude Code 安装器(手动模式)
-scripts/build.mjs                 构建 dist/precise-edit-skill.zip 与 dist/precise-edit.plugin
+scripts/build.mjs                 构建 dist/ 中的上传包(precise-edit 与 LaTeX Fix)
+Latex Fix/                        修复 #2:ChatGPT LaTeX 规则、skill、油猴脚本、转换网页
 tests/                            node:test 测试(CI 覆盖 Linux、macOS、Windows)
 ```
+
+### 修复 #2:LaTeX Fix,让 ChatGPT 的公式正确渲染、可以复制
+
+**问题。** ChatGPT 的公式有时渲染错误(原始的 `\[ \]`、裸的 `[ ]` / `( )`、红色报错),而且公式的 LaTeX 无法复制,在桌面端和手机 App 上尤其明显。
+
+**修复。** 一条写进自定义指令的规则:限定模型只用 ChatGPT 能渲染的定界符和命令,并让每个含公式的回答末尾附上可复制的 `latex` 源码块。自定义指令保存在账号里,所以网页、桌面端和 iOS / Android App 都生效。可选增强:skill、chatgpt.com 油猴脚本,以及把公式转换成 Obsidian / Typora / Notion 格式的转换网页。
+
+全部内容在 [`Latex Fix/`](Latex%20Fix/)。从 [`Latex Fix/chatgpt/custom-instructions.md`](Latex%20Fix/chatgpt/custom-instructions.md) 开始。
 
 ### 卸载
 

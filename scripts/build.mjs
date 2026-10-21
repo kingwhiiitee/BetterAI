@@ -2,6 +2,9 @@
 // Builds the upload packages into dist/ (no dependencies, reproducible bytes):
 //   dist/precise-edit-skill.zip  the skill folder, for Claude.ai and ChatGPT skill uploads
 //   dist/precise-edit.plugin     the full plugin, for Claude Cowork
+//   dist/latex-fix-skill.zip     the LaTeX Fix skill, for Claude.ai and ChatGPT skill uploads
+//   dist/chatgpt-latex-fix.user.js  the LaTeX Fix userscript
+//   dist/latex-fix-converter.html   the LaTeX Fix converter as one self-contained page
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGIN = path.join(REPO, 'plugins', 'precise-edit');
+const LATEX = path.join(REPO, 'Latex Fix');
 const DIST = path.join(REPO, 'dist');
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
@@ -99,3 +103,14 @@ function pack(dir, prefix, out) {
 fs.mkdirSync(DIST, { recursive: true });
 pack(path.join(PLUGIN, 'skills', 'precise-edit'), 'precise-edit/', path.join(DIST, 'precise-edit-skill.zip'));
 pack(PLUGIN, '', path.join(DIST, 'precise-edit.plugin'));
+pack(path.join(LATEX, 'skills', 'latex-fix'), 'latex-fix/', path.join(DIST, 'latex-fix-skill.zip'));
+
+const userscript = fs.readFileSync(path.join(LATEX, 'userscript', 'chatgpt-latex-fix.user.js'), 'utf8');
+fs.writeFileSync(path.join(DIST, 'chatgpt-latex-fix.user.js'), userscript);
+console.log('dist/chatgpt-latex-fix.user.js');
+
+const TAG = '<script src="../userscript/chatgpt-latex-fix.user.js"></script>';
+const page = fs.readFileSync(path.join(LATEX, 'web', 'converter.html'), 'utf8');
+if (!page.includes(TAG) || userscript.includes('</script')) throw new Error('cannot inline the userscript into converter.html');
+fs.writeFileSync(path.join(DIST, 'latex-fix-converter.html'), page.replace(TAG, () => `<script>\n${userscript}</script>`));
+console.log('dist/latex-fix-converter.html');
