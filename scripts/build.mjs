@@ -3,6 +3,7 @@
 //   dist/precise-edit-skill.zip  the skill folder, for Claude.ai and ChatGPT skill uploads
 //   dist/precise-edit.plugin     the full plugin, for Claude Cowork
 //   dist/latex-fix-skill.zip     the LaTeX Fix skill, for Claude.ai and ChatGPT skill uploads
+//   dist/adaptive-learning-coach-skill.zip  the adaptive learning coach skill, for Claude.ai and ChatGPT skill uploads
 //   dist/chatgpt-latex-fix.user.js  the LaTeX Fix userscript
 //   dist/latex-fix-converter.html   the LaTeX Fix converter as one self-contained page
 
@@ -104,6 +105,7 @@ fs.mkdirSync(DIST, { recursive: true });
 pack(path.join(PLUGIN, 'skills', 'precise-edit'), 'precise-edit/', path.join(DIST, 'precise-edit-skill.zip'));
 pack(PLUGIN, '', path.join(DIST, 'precise-edit.plugin'));
 pack(path.join(LATEX, 'skills', 'latex-fix'), 'latex-fix/', path.join(DIST, 'latex-fix-skill.zip'));
+pack(path.join(REPO, 'plugins', 'adaptive-learning-coach', 'skills', 'adaptive-learning-coach'), 'adaptive-learning-coach/', path.join(DIST, 'adaptive-learning-coach-skill.zip'));
 
 const userscript = fs.readFileSync(path.join(LATEX, 'userscript', 'chatgpt-latex-fix.user.js'), 'utf8');
 fs.writeFileSync(path.join(DIST, 'chatgpt-latex-fix.user.js'), userscript);

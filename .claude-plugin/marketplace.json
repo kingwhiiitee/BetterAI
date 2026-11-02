@@ -11,6 +11,13 @@
       "description": "Make agents use exact-match edits (Edit / str_replace / apply_patch) and block whole-file rewrites of existing files",
       "version": "1.0.0",
       "keywords": ["edit", "str_replace", "apply_patch", "hooks", "guardrail"]
+    },
+    {
+      "name": "adaptive-learning-coach",
+      "source": "./plugins/adaptive-learning-coach",
+      "description": "Adaptive study coach for time-limited, exam-oriented learners: picks diagnose / explain / practice / review by expected learning gain",
+      "version": "0.1.0",
+      "keywords": ["learning", "tutor", "study", "exam"]
     }
   ]
 }
