@@ -1,6 +1,7 @@
 import { Chip } from "@/components/base/badges/chip";
 import { useApi, type OpenDecision, type Overview } from "@/lib/api";
 import { ACTION, DECISION_STATUS, fmtTime } from "@/lib/labels";
+import { MathText } from "@/components/math-text";
 import { href } from "@/lib/router";
 import { Card, Empty, ErrorCard, Loading, PageHeader, ValuePips } from "@/components/ui";
 import { cx } from "@/utils/cx";
@@ -46,10 +47,10 @@ export function DecisionList({ decisions, compact }: { decisions: OpenDecision[]
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-body-medium text-text-primary">{d.title ?? "整门课"}</span>
+                <span className="text-body-medium text-text-primary">{d.title ? <MathText>{d.title}</MathText> : "整门课"}</span>
                 {d.node_id ? <ValuePips value={d.exam_value} /> : null}
               </div>
-              <span className="text-body-2-regular text-text-secondary">{d.reason}</span>
+              <span className="text-body-2-regular text-text-secondary"><MathText>{d.reason}</MathText></span>
               {!compact && (d.condition || d.status) ? (
                 <span className="text-caption-1-regular text-text-tertiary">
                   {DECISION_STATUS[d.status]}

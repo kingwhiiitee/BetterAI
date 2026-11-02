@@ -22,6 +22,7 @@ import {
   VALUE_LABEL,
   fmtTime,
 } from "@/lib/labels";
+import { MathText } from "@/components/math-text";
 import { href } from "@/lib/router";
 import { Card, CardTitle, Empty, ErrorCard, Field, LevelChip, Loading, PageHeader, ValuePips } from "@/components/ui";
 import { cx } from "@/utils/cx";
@@ -49,10 +50,12 @@ export function NodePage({ id }: { id: number }) {
       <Breadcrumb className="mb-3">
         <BreadcrumbItem href={href.overview}>我的课程</BreadcrumbItem>
         <BreadcrumbItem href={href.course(node.course_id)}>{course.data?.course.name ?? "课程"}</BreadcrumbItem>
-        <BreadcrumbItem current>{node.title}</BreadcrumbItem>
+        <BreadcrumbItem current>
+          <MathText>{node.title}</MathText>
+        </BreadcrumbItem>
       </Breadcrumb>
       <PageHeader
-        title={node.title}
+        title={<MathText>{node.title}</MathText>}
         sub={
           <span className="flex flex-wrap items-center gap-2">
             <span>{KIND[node.kind] ?? node.kind}</span>
@@ -74,7 +77,7 @@ export function NodePage({ id }: { id: number }) {
               <dl className="flex flex-col gap-4">
                 {facts.map(([k, v]) => (
                   <Field key={k} label={k}>
-                    {v}
+                    <MathText>{v}</MathText>
                   </Field>
                 ))}
               </dl>
@@ -119,8 +122,8 @@ export function NodePage({ id }: { id: number }) {
                           {fmtTime(s.assessed_at)} · {ASSESSED_BY[s.assessed_by]}判断
                         </span>
                       </div>
-                      {s.weak_point ? <span className="text-caption-1-regular text-status-rose-text">卡在：{s.weak_point}</span> : null}
-                      {s.rationale ? <p className="text-body-2-regular text-text-secondary">{s.rationale}</p> : null}
+                      {s.weak_point ? <span className="text-caption-1-regular text-status-rose-text">卡在：<MathText>{s.weak_point}</MathText></span> : null}
+                      {s.rationale ? <p className="text-body-2-regular text-text-secondary"><MathText>{s.rationale}</MathText></p> : null}
                       <span className="text-caption-2-regular text-text-tertiary">依据证据 {fmtBasis(s.basis)}</span>
                     </div>
                   </li>
@@ -171,7 +174,7 @@ export function NodePage({ id }: { id: number }) {
                           <span className="text-text-tertiary">{UNCERTAINTY[v.uncertainty]}</span>
                         </span>
                       </TableCell>
-                      <TableCell>{v.basis}</TableCell>
+                      <TableCell><MathText>{v.basis}</MathText></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -195,16 +198,16 @@ export function NodePage({ id }: { id: number }) {
                       </Chip>
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <span className={cx("text-body-2-regular text-text-primary", d.status === "revoked" && "line-through")}>
-                          {d.reason}
+                          <MathText>{d.reason}</MathText>
                         </span>
                         <span className="text-caption-1-regular text-text-tertiary">
                           {DECISION_STATUS[d.status]} · {fmtTime(d.decided_at, false)}
                           {d.condition ? ` · 条件：${d.condition}` : ""}
                         </span>
                         {d.revoked_why ? (
-                          <span className="text-caption-1-regular text-text-tertiary">撤销原因：{d.revoked_why}</span>
+                          <span className="text-caption-1-regular text-text-tertiary">撤销原因：<MathText>{d.revoked_why}</MathText></span>
                         ) : null}
-                        {d.outcome ? <span className="text-caption-1-regular text-text-secondary">效果：{d.outcome}</span> : null}
+                        {d.outcome ? <span className="text-caption-1-regular text-text-secondary">效果：<MathText>{d.outcome}</MathText></span> : null}
                       </div>
                     </li>
                   );
@@ -226,8 +229,8 @@ export function NodePage({ id }: { id: number }) {
                       className="-mx-2 flex items-center gap-2 rounded-xl px-2 py-1.5 outline-none hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring"
                     >
                       <span className="w-20 shrink-0 text-caption-1-medium text-text-tertiary">{r.label}</span>
-                      <span className="text-body-2-medium text-text-primary">{r.title}</span>
-                      {r.note ? <span className="truncate text-caption-1-regular text-text-tertiary">{r.note}</span> : null}
+                      <span className="text-body-2-medium text-text-primary"><MathText>{r.title}</MathText></span>
+                      {r.note ? <span className="truncate text-caption-1-regular text-text-tertiary"><MathText>{r.note}</MathText></span> : null}
                     </a>
                   </li>
                 ))}
@@ -290,15 +293,17 @@ function EvidenceItem({ e }: { e: EvidenceRow }) {
         <p className="text-body-2-regular text-text-secondary">
           {e.task_source ? `${TASK_SOURCE[e.task_source] ?? e.task_source} · ` : ""}
           {e.source_ref ? `${e.source_ref} · ` : ""}
-          {e.task_prompt}
-          {e.step_no ? `（第 ${e.step_no} 步${e.role === "supporting" ? "，辅助" : ""}${e.step_description ? `：${e.step_description}` : ""}）` : ""}
+          <MathText>{e.task_prompt}</MathText>
+          {e.step_no ? `（第 ${e.step_no} 步${e.role === "supporting" ? "，辅助" : ""}` : ""}
+          {e.step_no && e.step_description ? <>：<MathText>{e.step_description}</MathText></> : null}
+          {e.step_no ? "）" : ""}
         </p>
       ) : null}
       {meta.length ? <span className="text-caption-1-regular text-text-tertiary">{meta.join(" · ")}</span> : null}
       {e.interpretation ? (
-        <p className="text-body-2-regular text-status-orange-text">实际用的规则：{e.interpretation}</p>
+        <p className="text-body-2-regular text-status-orange-text">实际用的规则：<MathText>{e.interpretation}</MathText></p>
       ) : null}
-      {e.note ? <p className="text-body-2-regular text-text-primary">{e.note}</p> : null}
+      {e.note ? <p className="text-body-2-regular text-text-primary"><MathText>{e.note}</MathText></p> : null}
     </li>
   );
 }

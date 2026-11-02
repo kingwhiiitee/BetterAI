@@ -57,6 +57,8 @@ D1 数据库已经存在，`wrangler.jsonc` 里的 `database_id` 指向它。全
 - **知识点详情**：定义 / 直觉 / 适用条件 / 易错点，状态变化及理由，学习证据时间线，考核价值依据，教学决策，相关知识点
 - **待办决策**：待执行的讲解、练习、复测，以及生效中的学 / 略读 / 跳过
 
+文字里的 LaTeX 公式（`$…$`、`$$…$$`、`\(…\)`、`\[…\]`）由本地打包的 KaTeX 渲染，不依赖外部 CDN。
+
 网页是 React + Tailwind v4 + [BoardUI](https://www.boardui.com) 组件，用 Vite 构建到 `public/`。构建结果已提交，`wrangler deploy` 前不需要再构建；改了 `web/` 之后运行 `npm run build:web`。
 
 ## 本地开发

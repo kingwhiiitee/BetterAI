@@ -2,6 +2,7 @@ import { RiArrowRightSLine, RiCalendarLine } from "@remixicon/react";
 import { Chip } from "@/components/base/badges/chip";
 import { useApi, type Course, type Overview as OverviewData } from "@/lib/api";
 import { LEVEL, LEVELS, COURSE_STATUS, ASSESSMENT_STATUS, daysUntil, fmtTime } from "@/lib/labels";
+import { MathText } from "@/components/math-text";
 import { href } from "@/lib/router";
 import { Card, CardTitle, Empty, ErrorCard, Loading, PageHeader } from "@/components/ui";
 import { DecisionList } from "./Decisions";
@@ -52,7 +53,7 @@ export function OverviewPage() {
                     {s.planned_min ? ` · 计划 ${s.planned_min} 分钟` : ""}
                     {s.goal ? ` · ${s.goal}` : ""}
                   </span>
-                  <span className="text-body-2-regular text-text-primary">{s.summary ?? "（未写总结）"}</span>
+                  <span className="text-body-2-regular text-text-primary">{s.summary ? <MathText>{s.summary}</MathText> : "（未写总结）"}</span>
                 </li>
               ))}
             </ol>

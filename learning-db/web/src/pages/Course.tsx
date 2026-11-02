@@ -8,6 +8,7 @@ import { SegmentedControl, SegmentedControlItem } from "@/components/base/segmen
 import { Tabs, TabList, Tab, TabPanel } from "@/components/base/tabs/tabs";
 import { useApi, type CourseTree, type Level, type TreeNode, type ValueRow, type ScopeDecision } from "@/lib/api";
 import { ACTION, KIND, LEVEL, LEVELS, daysUntil } from "@/lib/labels";
+import { MathText } from "@/components/math-text";
 import { href } from "@/lib/router";
 import { Card, Empty, ErrorCard, LevelChip, Loading, PageHeader, ValuePips } from "@/components/ui";
 import { cx } from "@/utils/cx";
@@ -184,7 +185,7 @@ function NodeCard({ node: n, ctx, compact }: { node: TreeNode; ctx: Ctx; compact
       )}
     >
       <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-body-medium text-text-primary">{n.title}</span>
+        <span className="min-w-0 flex-1 truncate text-body-medium text-text-primary"><MathText>{n.title}</MathText></span>
         <ValuePips value={v?.value ?? null} uncertainty={v?.uncertainty} />
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
@@ -203,7 +204,7 @@ function NodeCard({ node: n, ctx, compact }: { node: TreeNode; ctx: Ctx; compact
         ) : null}
       </div>
       {n.weak_point && !compact ? (
-        <span className="text-caption-1-regular text-status-rose-text">卡在：{n.weak_point}</span>
+        <span className="text-caption-1-regular text-status-rose-text">卡在：<MathText>{n.weak_point}</MathText></span>
       ) : null}
     </a>
   );
