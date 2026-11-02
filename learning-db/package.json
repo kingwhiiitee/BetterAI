@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "dev:web": "npm --prefix web run dev",
+    "build:web": "npm --prefix web ci && npm --prefix web run build",
     "deploy": "wrangler deploy",
     "db:init:local": "wrangler d1 execute learning-knowledge --local --file schema.sql",
     "typecheck": "tsc --noEmit",

@@ -4,7 +4,7 @@
 
 - `/mcp`：给 AI 用的 MCP 接口（16 个固定工具，AI 不直接写 SQL）
 - `/api/*`：给阅览网页用的只读 JSON
-- `/`：阅览网页（开发中，计划用 BoardUI）
+- `/`：阅览网页（BoardUI，源码在 [web/](web)，构建产物在 `public/`）
 
 数据存在 Cloudflare D1（`learning-knowledge`），表结构见 [schema.sql](schema.sql)。
 
@@ -48,6 +48,17 @@ D1 数据库已经存在，`wrangler.jsonc` 里的 `database_id` 指向它。全
 - **Claude.ai**：设置 → 连接器 → 添加自定义连接器，URL 填 `https://<worker 域名>/mcp/<ACCESS_TOKEN>`。令牌在 URL 里，不要把这个地址分享出去。
 - **Claude Code**：`claude mcp add --transport http learning-knowledge https://<worker 域名>/mcp --header "Authorization: Bearer <ACCESS_TOKEN>"`
 
+## 阅览网页
+
+打开 Worker 域名，输入 `ACCESS_TOKEN` 即可（令牌只存在本机浏览器）。页面：
+
+- **我的课程**：每门课的七种状态分布、考核目标和倒计时、下一步决策、最近学习记录
+- **课程知识树**：按状态分组看所有知识点（考核价值用三个点表示，可切换考核目标）；或切到"前置关系"看分层依赖图；可搜索
+- **知识点详情**：定义 / 直觉 / 适用条件 / 易错点，状态变化及理由，学习证据时间线，考核价值依据，教学决策，相关知识点
+- **待办决策**：待执行的讲解、练习、复测，以及生效中的学 / 略读 / 跳过
+
+网页是 React + Tailwind v4 + [BoardUI](https://www.boardui.com) 组件，用 Vite 构建到 `public/`。构建结果已提交，`wrangler deploy` 前不需要再构建；改了 `web/` 之后运行 `npm run build:web`。
+
 ## 本地开发
 
 ```bash
@@ -56,4 +67,6 @@ npm run db:init:local
 npm run dev
 # 另开一个终端，用一个全新的本地库运行端到端检查
 BASE=http://127.0.0.1:8787 TOKEN=test-token-0123456789abcdef npm run e2e
+# 改网页：再开一个终端，Vite 会把 /api 代理到 8787
+npm run dev:web
 ```
