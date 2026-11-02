@@ -15,6 +15,7 @@ import {
   OUTCOME,
   QUALIFIER,
   RELATION,
+  REPRESENTATION,
   SELF_SIGNAL,
   TASK_SOURCE,
   UNCERTAINTY,
@@ -127,6 +128,28 @@ export function NodePage({ id }: { id: number }) {
               </ol>
             )}
           </Card>
+
+          {data.representations_tried?.length ? (
+            <Card>
+              <CardTitle>试过的讲法</CardTitle>
+              <ul className="flex flex-col gap-2">
+                {data.representations_tried.map((r) => (
+                  <li key={r.representation} className="flex items-center gap-2">
+                    <span className="w-20 shrink-0 text-body-2-medium text-text-primary">
+                      {REPRESENTATION[r.representation] ?? r.representation}
+                    </span>
+                    <span className="text-caption-1-regular text-text-secondary">用过 {r.times_used} 次</span>
+                    {r.failed_checks ? (
+                      <Chip variant="caption" color="rose">
+                        检查失败 {r.failed_checks}
+                      </Chip>
+                    ) : null}
+                    <span className="ms-auto text-caption-1-regular text-text-tertiary">{fmtTime(r.last_used, false)}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
 
           <Card>
             <CardTitle>考核价值</CardTitle>
@@ -251,6 +274,11 @@ function EvidenceItem({ e }: { e: EvidenceRow }) {
             {QUALIFIER[e.qualifier]}
           </Chip>
         ) : null}
+        {e.representation ? (
+          <Chip variant="caption" color="cyan" title="讲解方式">
+            {REPRESENTATION[e.representation] ?? e.representation}
+          </Chip>
+        ) : null}
         {e.difficulties.map((d) => (
           <Chip key={d} variant="caption" color="orange">
             {DIFFICULTY[d] ?? d}
@@ -267,6 +295,9 @@ function EvidenceItem({ e }: { e: EvidenceRow }) {
         </p>
       ) : null}
       {meta.length ? <span className="text-caption-1-regular text-text-tertiary">{meta.join(" · ")}</span> : null}
+      {e.interpretation ? (
+        <p className="text-body-2-regular text-status-orange-text">实际用的规则：{e.interpretation}</p>
+      ) : null}
       {e.note ? <p className="text-body-2-regular text-text-primary">{e.note}</p> : null}
     </li>
   );

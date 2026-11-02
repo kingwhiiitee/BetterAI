@@ -170,7 +170,9 @@ export interface StateRow {
 
 export interface EvidenceRow {
   id: number;
-  kind: "step" | "exposure" | "self_explain" | "self_report";
+  kind: "step" | "exposure" | "prediction" | "self_explain" | "self_report";
+  representation: string | null;
+  interpretation: string | null;
   outcome: string | null;
   qualifier: string | null;
   note: string | null;
@@ -220,6 +222,7 @@ export interface NodeDetail {
   };
   current_state: Partial<StateRow> & { level: Level };
   state_history: StateRow[];
+  representations_tried?: { representation: string; times_used: number; last_used: string; failed_checks: number }[];
   rule_baseline: { node_id: number; last_seen: string | null; suggested_level: Level } | null;
   values: (ValueRow & { id: number; assessment: string; basis: string; sources: string | null; assessed_at: string })[];
   edges: {

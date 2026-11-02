@@ -56,6 +56,7 @@ export const UNCERTAINTY: Record<string, string> = { low: "把握大", medium: "
 export const EVIDENCE_KIND: Record<string, string> = {
   step: "作答步骤",
   exposure: "接触材料",
+  prediction: "随堂检查",
   self_explain: "自己解释",
   self_report: "主观自评",
 };
@@ -64,6 +65,17 @@ export const OUTCOME: Record<string, { label: string; color: ChipColor }> = {
   failed: { label: "出错", color: "rose" },
   not_reached: { label: "没做到", color: "neutral" },
   unclear: { label: "不明确", color: "neutral" },
+};
+export const REPRESENTATION: Record<string, string> = {
+  verbal: "口头讲解",
+  worked_example: "完整例题",
+  faded_example: "渐隐例题",
+  counterexample: "反例",
+  graph: "图像",
+  numeric: "数值",
+  formal: "形式推导",
+  analogy: "类比",
+  hands_on: "动手操作",
 };
 export const QUALIFIER: Record<string, string> = { guessed: "猜的", slip: "手误", lucky_path: "碰巧对" };
 export const CONTEXT: Record<string, string> = {
