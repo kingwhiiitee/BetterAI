@@ -217,6 +217,7 @@ description: 面向多门课程、考试导向与学习时间有限的用户，�
 
 - **开始：** 先调 `overview`，看上次的中断点、待办与生效中的决策；再用 `review_candidates` 或 `get_node` 选本轮任务。用户说"继续"时据此直接开始。
 - **建节点：** 新知识点用 `upsert_node`，先修、包含、易混淆关系用 `link_nodes`。
+- **公式写法：** 写进知识库的任何文字（定义、直觉、易错点、证据备注、理由等）中的公式一律用 LaTeX，并加定界符：行内 `$\sigma(z)=\frac{1}{1+e^{-z}}$`，独立成行 `$$…$$`。阅览网页只渲染带定界符的 LaTeX；不要写 `wᵀx`、`e^{w_j}`、`Σ` 这类裸露的 Unicode 或未加定界符的记号。
 - **讲解时：** 讲完一次记 `record_evidence`（kind=exposure，填 representation）；穿插的检验记 kind=prediction，填 outcome、representation，并在 interpretation 写下学生实际理解成了什么。讲新内容前看 `get_node` 的 representations_tried，遵守"同一表征连续两次失败就换"。
 - **作答后：** 用 `record_attempt`，把题目拆成步骤，每步对应一个节点（core / supporting），逐步给结果。做错只记真正出错的那一步；没做到的步骤记 not_reached；猜对记 qualifier=guessed，手误记 slip。学习困难类型可多选，只用于出错或不清楚的步骤。
 - **自估把握可选：** 只有学生主动说"我猜的""不确定"，或你判断有必要区分猜测与理解而询问时才填写，否则留空，绝不编造。

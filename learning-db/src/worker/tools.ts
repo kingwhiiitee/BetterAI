@@ -357,7 +357,7 @@ export const TOOLS: Tool[] = [
   {
     name: 'upsert_node',
     description:
-      'Create a knowledge node, or fill in/replace facts of an existing node with the same course and title. Only facts about the knowledge itself belong here (definition, intuition, boundary conditions, common pitfalls); the student\'s state, exam value and learn/skip choices go elsewhere.',
+      'Create a knowledge node, or fill in/replace facts of an existing node with the same course and title. Only facts about the knowledge itself belong here (definition, intuition, boundary conditions, common pitfalls); the student\'s state, exam value and learn/skip choices go elsewhere. Write every formula as LaTeX inside $...$ (inline) or $$...$$ (display), e.g. $P(y=1\\mid x)=\\sigma(w^\\top x+b)$; the web viewer renders only delimited LaTeX, so never use bare Unicode math like wᵀx or e^{w} without $ delimiters. The same applies to formulas in any other free-text field (notes, rationale, reasons).',
     inputSchema: obj(
       {
         course_id: int('Course id'),
