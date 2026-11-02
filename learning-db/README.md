@@ -1,0 +1,59 @@
+# learning-knowledge：个人学习知识库
+
+给 [adaptive-learning-coach](../plugins/adaptive-learning-coach/skills/adaptive-learning-coach/SKILL.md) 用的跨会话记忆。一个 Cloudflare Worker 同时提供：
+
+- `/mcp`：给 AI 用的 MCP 接口（16 个固定工具，AI 不直接写 SQL）
+- `/api/*`：给阅览网页用的只读 JSON
+- `/`：阅览网页（开发中，计划用 BoardUI）
+
+数据存在 Cloudflare D1（`learning-knowledge`），表结构见 [schema.sql](schema.sql)。
+
+## 数据模型
+
+按 Evidence-Centered Design 分四层：
+
+| 层 | 表 | 说明 |
+| --- | --- | --- |
+| 知识节点 | `courses` `nodes` `edges` `assessments` `node_values` `tasks` `task_steps` | 知识本身；考核价值按"节点 × 考核目标"估计，带依据和不确定性 |
+| 学习证据 | `sessions` `attempts` `evidence` `evidence_difficulties` | 一道题拆成步骤，每步落到一个节点；做错只记真正出错的那一步 |
+| 知识状态 | `knowledge_states` | 七种状态：unknown / exposed / assisted / independent / validated / weak / recheck；只追加，必须引用证据 |
+| 教学决策 | `decisions` | 讲解、练习、复测、推进，以及可撤销的学 / 略读 / 跳过 |
+
+视图：`current_state`（每个节点的最新状态）、`rule_baseline`（只看证据的机械建议，供 AI 参考）、`current_values`、`open_decisions`。
+
+## MCP 工具
+
+| 读 | 写 |
+| --- | --- |
+| `overview` `find_nodes` `get_node` `review_candidates` | `upsert_course` `upsert_assessment` `upsert_node` `link_nodes` `start_session` `end_session` `record_attempt` `record_evidence` `assess_state` `estimate_value` `decide` `update_decision` |
+
+工具层强制几条规则：状态必须引用本节点的证据；没有真实资料不能把考核价值标为 3；新的学 / 略读 / 跳过决定会自动撤销旧决定；撤销决定必须写原因；自估把握只在提供时记录。
+
+## 部署
+
+```bash
+cd learning-db
+npm install
+npx wrangler login                      # 或设置 CLOUDFLARE_API_TOKEN
+npx wrangler secret put ACCESS_TOKEN    # 输入一个 16 位以上的随机字符串
+npx wrangler deploy
+```
+
+D1 数据库已经存在，`wrangler.jsonc` 里的 `database_id` 指向它。全新数据库需要先执行 `npx wrangler d1 execute learning-knowledge --remote --file schema.sql`。
+
+没有设置 `ACCESS_TOKEN`（或少于 16 位）时，`/mcp` 和 `/api` 一律返回 401。
+
+## 连接到 AI
+
+- **Claude.ai**：设置 → 连接器 → 添加自定义连接器，URL 填 `https://<worker 域名>/mcp/<ACCESS_TOKEN>`。令牌在 URL 里，不要把这个地址分享出去。
+- **Claude Code**：`claude mcp add --transport http learning-knowledge https://<worker 域名>/mcp --header "Authorization: Bearer <ACCESS_TOKEN>"`
+
+## 本地开发
+
+```bash
+echo 'ACCESS_TOKEN="test-token-0123456789abcdef"' > .dev.vars
+npm run db:init:local
+npm run dev
+# 另开一个终端，用一个全新的本地库运行端到端检查
+BASE=http://127.0.0.1:8787 TOKEN=test-token-0123456789abcdef npm run e2e
+```
