@@ -401,6 +401,7 @@ export const TOOLS: Tool[] = [
         course_id: int('Course id'),
         title: str('Node title, unique within the course'),
         kind: oneOf(KINDS, 'Node type'),
+        usage: str('What problem it solves, when to reach for it, how to use it (layers 1-2)'),
         definition: str('Rigorous definition or formula'),
         intuition: str('Intuitive explanation'),
         boundary: str('Conditions and counterexamples'),
@@ -413,10 +414,11 @@ export const TOOLS: Tool[] = [
       await mustExist(env, 'courses', need<number>(a, 'course_id'), 'course');
       const row = await first<{ id: number }>(
         env,
-        `INSERT INTO nodes (course_id, title, kind, definition, intuition, boundary, pitfalls)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO nodes (course_id, title, kind, usage, definition, intuition, boundary, pitfalls)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(course_id, title) DO UPDATE SET
            kind = excluded.kind,
+           usage = COALESCE(excluded.usage, nodes.usage),
            definition = COALESCE(excluded.definition, nodes.definition),
            intuition = COALESCE(excluded.intuition, nodes.intuition),
            boundary = COALESCE(excluded.boundary, nodes.boundary),
@@ -425,6 +427,7 @@ export const TOOLS: Tool[] = [
         a.course_id,
         need<string>(a, 'title'),
         a.kind,
+        opt(a, 'usage'),
         opt(a, 'definition'),
         opt(a, 'intuition'),
         opt(a, 'boundary'),

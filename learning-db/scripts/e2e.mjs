@@ -39,6 +39,9 @@ for (const [title, kind] of [['前向传播', 'method'], ['激活函数导数', 
   ids[title] = (await call('upsert_node', { course_id, title, kind })).node_id;
 check(Object.values(ids).every(Boolean), 'nodes created');
 check((await call('upsert_node', { course_id, title: '链式法则', kind: 'theorem', definition: 'd(f∘g)=f\'(g)g\'' })).node_id === ids['链式法则'], 'upsert_node updates in place');
+await call('upsert_node', { course_id, title: '链式法则', kind: 'theorem', usage: '复合函数求导时用' });
+const un = await call('get_node', { node_id: ids['链式法则'] });
+check(un.node.usage === '复合函数求导时用' && un.node.definition, 'usage stored without wiping other facts');
 await call('link_nodes', { from_id: ids['链式法则'], to_id: ids['误差反传'], relation: 'prerequisite_of' });
 
 const v3 = await call('estimate_value', { node_id: ids['链式法则'], assessment_id, value: 3, uncertainty: 'high', basis: '感觉重要', sources: ['guess'] });

@@ -20,6 +20,7 @@ CREATE TABLE nodes (
   course_id     INTEGER NOT NULL REFERENCES courses(id),
   title         TEXT NOT NULL,
   kind          TEXT NOT NULL CHECK (kind IN ('concept','definition','theorem','formula','method','problem_type')),
+  usage         TEXT,                 -- 用途与用法：解决什么问题、何时想到它、怎么用
   definition    TEXT,                 -- 严谨定义 / 公式
   intuition     TEXT,                 -- 直觉解释
   boundary      TEXT,                 -- 适用条件、反例
