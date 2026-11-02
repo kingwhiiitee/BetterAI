@@ -125,6 +125,7 @@ CREATE TABLE evidence (
   kind          TEXT NOT NULL CHECK (kind IN (
                   'step',             -- 作答中某一步的表现
                   'exposure',         -- 听过讲解 / 读过材料
+                  'prediction',       -- 讲解中穿插的预测、分类、判断或举反例
                   'self_explain',     -- 你用自己的话解释
                   'self_report'       -- 主观"懂了/不懂"，权重最低
                 )),
@@ -134,6 +135,18 @@ CREATE TABLE evidence (
                   'slip',             -- 答错但只是手误：不算知识缺口
                   'lucky_path'        -- 方法不对却碰巧得到正确结果
                 )),
+  representation TEXT CHECK (representation IN (
+                  'verbal',           -- 文字解释
+                  'worked_example',   -- 完整已解例题
+                  'faded_example',    -- 逐步撤除步骤的例题
+                  'counterexample',   -- 正例 / 反例 / 边界案例
+                  'graph',            -- 图形、示意图
+                  'numeric',          -- 具体数值演算
+                  'formal',           -- 符号推导、证明
+                  'analogy',          -- 类比
+                  'hands_on'          -- 动手操作、模拟、代码
+                )),                   -- 讲解用了哪种表征（exposure / prediction 时填）
+  interpretation TEXT,                -- 学生把规则理解成了什么（尤其是理解偏差）
   note          TEXT,
   CHECK (kind <> 'step' OR (attempt_id IS NOT NULL AND outcome IS NOT NULL))
 );

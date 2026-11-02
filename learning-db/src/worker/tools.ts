@@ -36,6 +36,8 @@ const DIFFICULTIES = ['unknown_concept', 'condition', 'recognition', 'execution'
 const LEVELS = ['unknown', 'exposed', 'assisted', 'independent', 'validated', 'weak', 'recheck'];
 const VALUE_SOURCES = ['syllabus', 'past_paper', 'teacher', 'homework', 'textbook', 'guess'];
 const UNCERTAINTY = ['low', 'medium', 'high'];
+const REPRESENTATIONS = ['verbal', 'worked_example', 'faded_example', 'counterexample', 'graph', 'numeric', 'formal', 'analogy', 'hands_on'];
+const LIGHT_KINDS = ['exposure', 'prediction', 'self_explain', 'self_report'];
 const ACTIONS = ['diagnose', 'explain', 'practice', 'retest', 'advance', 'learn', 'skim', 'skip'];
 const SCOPE_ACTIONS = ['learn', 'skim', 'skip'];
 
@@ -164,14 +166,14 @@ export async function courseTree(env: Env, courseId: number) {
 
 export async function nodeDetail(env: Env, nodeId: number) {
   const node = await mustExist(env, 'nodes', nodeId, 'node');
-  const [edgesOut, edgesIn, states, values, evidence, decisions, baseline] = await Promise.all([
+  const [edgesOut, edgesIn, states, values, evidence, decisions, baseline, representations] = await Promise.all([
     all(env, `SELECT e.relation, e.note, e.to_id AS node_id, n.title FROM edges e JOIN nodes n ON n.id = e.to_id WHERE e.from_id = ?`, nodeId),
     all(env, `SELECT e.relation, e.note, e.from_id AS node_id, n.title FROM edges e JOIN nodes n ON n.id = e.from_id WHERE e.to_id = ?`, nodeId),
     all(env, `SELECT * FROM knowledge_states WHERE node_id = ? ORDER BY assessed_at DESC, id DESC LIMIT 8`, nodeId),
     all(env, `SELECT v.*, a.name AS assessment FROM current_values v JOIN assessments a ON a.id = v.assessment_id WHERE v.node_id = ?`, nodeId),
     all(
       env,
-      `SELECT e.id, e.kind, e.outcome, e.qualifier, e.note, e.observed_at, e.attempt_id,
+      `SELECT e.id, e.kind, e.outcome, e.qualifier, e.representation, e.interpretation, e.note, e.observed_at, e.attempt_id,
               a.context, a.hints, a.overall, a.self_signal, a.confidence,
               t.source AS task_source, t.source_ref, t.prompt AS task_prompt,
               ts.step_no, ts.role, ts.description AS step_description,
@@ -185,12 +187,23 @@ export async function nodeDetail(env: Env, nodeId: number) {
     ),
     all(env, `SELECT * FROM decisions WHERE node_id = ? ORDER BY decided_at DESC, id DESC LIMIT 10`, nodeId),
     first(env, `SELECT * FROM rule_baseline WHERE node_id = ?`, nodeId),
+    // How each way of explaining has gone so far: the following prediction/step outcomes after it was used
+    all(
+      env,
+      `SELECT x.representation, COUNT(*) AS times_used, MAX(x.observed_at) AS last_used,
+         (SELECT COUNT(*) FROM evidence p WHERE p.node_id = x.node_id AND p.kind = 'prediction'
+            AND p.representation = x.representation AND p.outcome = 'failed') AS failed_checks
+       FROM evidence x WHERE x.node_id = ? AND x.representation IS NOT NULL
+       GROUP BY x.representation ORDER BY last_used DESC`,
+      nodeId,
+    ),
   ]);
   return {
     node,
     current_state: states[0] ?? { level: 'unknown' },
     state_history: states,
     rule_baseline: baseline,
+    representations_tried: representations,
     values,
     edges: { outgoing: edgesOut, incoming: edgesIn },
     evidence: evidence.map((e) => ({ ...e, difficulties: JSON.parse(String(e.difficulties ?? '[]')) })),
@@ -245,7 +258,7 @@ export const TOOLS: Tool[] = [
     name: 'get_node',
     readOnly: true,
     description:
-      'Everything about one node: its facts, related nodes, current state and history, exam value per assessment, the most recent evidence (with task, step, context, hints and difficulty tags), decisions, and the mechanical rule_baseline suggestion.',
+      'Everything about one node: its facts, related nodes, current state and history, exam value per assessment, the most recent evidence (with task, step, context, hints, difficulty tags, representation and the student interpretation), which representations have been tried and how many embedded checks failed after each, decisions, and the mechanical rule_baseline suggestion.',
     inputSchema: obj({ node_id: nodeId }, ['node_id']),
     run: (env, a) => nodeDetail(env, need<number>(a, 'node_id')),
   },
@@ -485,6 +498,7 @@ export const TOOLS: Tool[] = [
               outcome: oneOf(OUTCOMES, 'Result on this step'),
               qualifier: oneOf(QUALIFIERS, 'Optional'),
               difficulties: { type: 'array', items: oneOf(DIFFICULTIES, 'Learning difficulty'), description: 'Optional, multi-select' },
+              interpretation: str('What rule the student actually applied here, if it differs from the intended one'),
               note: str('What happened'),
             },
             ['step_no', 'outcome'],
@@ -572,14 +586,15 @@ export const TOOLS: Tool[] = [
         const step = byNo.get(r.step_no as number)!;
         const id = await insertId(
           env,
-          `INSERT INTO evidence (node_id, attempt_id, step_id, session_id, kind, outcome, qualifier, note)
-           VALUES (?, ?, ?, ?, 'step', ?, ?, ?)`,
+          `INSERT INTO evidence (node_id, attempt_id, step_id, session_id, kind, outcome, qualifier, interpretation, note)
+           VALUES (?, ?, ?, ?, 'step', ?, ?, ?, ?)`,
           step.node_id,
           attemptId,
           step.id,
           sessionId,
           r.outcome,
           r.qualifier ?? null,
+          r.interpretation ?? null,
           r.note ?? null,
         );
         evidenceIds[step.step_no] = id;
@@ -595,29 +610,39 @@ export const TOOLS: Tool[] = [
   {
     name: 'record_evidence',
     description:
-      'Record evidence that is not an answered question: exposure (was taught / read it), self_explain (explained it in their own words; give outcome), self_report (student says they get it / do not; weakest evidence).',
+      'Record evidence that is not a full answered question. exposure: the student was taught or read it; give representation (which way it was explained). prediction: a quick embedded check during teaching (predict, classify, judge an instance, give a counterexample); give outcome, representation and, above all, interpretation. self_explain: explained it in their own words; give outcome. self_report: student says they get it or not; weakest evidence. interpretation = what rule the student actually seems to be using, in particular a misreading (e.g. 以为边际分布相同就严格平稳).',
     inputSchema: obj(
       {
         node_id: nodeId,
-        kind: oneOf(['exposure', 'self_explain', 'self_report'], 'Evidence kind'),
+        kind: oneOf(LIGHT_KINDS, 'Evidence kind'),
         session_id: int('Session id'),
-        outcome: oneOf(OUTCOMES, 'For self_explain'),
+        outcome: oneOf(OUTCOMES, 'For prediction and self_explain'),
+        qualifier: oneOf(QUALIFIERS, 'Optional, e.g. guessed'),
+        representation: oneOf(REPRESENTATIONS, 'How it was explained (exposure, prediction)'),
+        interpretation: str('What the student took the rule to be'),
         difficulties: { type: 'array', items: oneOf(DIFFICULTIES, 'Learning difficulty') },
         note: str('What was observed'),
       },
       ['node_id', 'kind'],
     ),
     run: async (env, a) => {
-      inEnum(need(a, 'kind'), ['exposure', 'self_explain', 'self_report'], 'kind');
+      inEnum(need(a, 'kind'), LIGHT_KINDS, 'kind');
       inEnum(opt(a, 'outcome'), OUTCOMES, 'outcome');
+      inEnum(opt(a, 'qualifier'), QUALIFIERS, 'qualifier');
+      inEnum(opt(a, 'representation'), REPRESENTATIONS, 'representation');
+      if (a.kind === 'prediction' && !opt(a, 'outcome')) throw new ToolError('prediction needs an outcome');
       await mustExist(env, 'nodes', need<number>(a, 'node_id'), 'node');
       const id = await insertId(
         env,
-        'INSERT INTO evidence (node_id, session_id, kind, outcome, note) VALUES (?, ?, ?, ?, ?)',
+        `INSERT INTO evidence (node_id, session_id, kind, outcome, qualifier, representation, interpretation, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         a.node_id,
         opt(a, 'session_id'),
         a.kind,
         opt(a, 'outcome'),
+        opt(a, 'qualifier'),
+        opt(a, 'representation'),
+        opt(a, 'interpretation'),
         opt(a, 'note'),
       );
       const diffs = (a.difficulties as string[] | undefined) ?? [];

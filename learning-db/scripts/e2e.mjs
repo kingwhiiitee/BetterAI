@@ -82,6 +82,12 @@ const d3 = await call('decide', { node_id: ids['链式法则'], assessment_id, a
 check(d3.status === 'planned', 'one-off decision is planned');
 check(!!(await call('update_decision', { decision_id: d3.decision_id, status: 'revoked' })).error, 'revoke needs a reason');
 await call('end_session', { session_id, summary: '链式法则条件不清；下次从复合函数求导开始' });
+await call('record_evidence', { node_id: ids['链式法则'], kind: 'exposure', representation: 'verbal', session_id });
+check(!!(await call('record_evidence', { node_id: ids['链式法则'], kind: 'prediction', representation: 'verbal' })).error, 'prediction without outcome rejected');
+await call('record_evidence', { node_id: ids['链式法则'], kind: 'prediction', representation: 'verbal', outcome: 'failed', interpretation: '以为外层导数不用代入内层函数' });
+const pn = await call('get_node', { node_id: ids['链式法则'] });
+check(pn.representations_tried[0]?.representation === 'verbal' && pn.representations_tried[0].failed_checks === 1, 'representations_tried counts failed checks per representation');
+check(pn.evidence[0].interpretation?.includes('外层'), 'interpretation is stored');
 
 const cand = await call('review_candidates', { course_id, assessment_id });
 check(cand[0]?.title === '链式法则', 'review_candidates ranks weak high-value node first');
