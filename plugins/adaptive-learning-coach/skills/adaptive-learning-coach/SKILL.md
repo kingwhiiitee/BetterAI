@@ -215,7 +215,7 @@ description: 面向多门课程、考试导向与学习时间有限的用户，�
 
 知识库按"以证据为中心的评价设计"分四层：**知识节点**（知识本身）、**学习证据**（可观察的表现）、**知识状态**（基于证据的推断）、**教学决策**（下一步做什么）。不要把学生的状态、考核价值或"学/略读/跳过"写进知识节点。
 
-- **开始：** 先调 `overview`，看上次的中断点、待办与生效中的决策；再用 `review_candidates` 或 `get_node` 选本轮任务。用户说"继续"时据此直接开始。
+- **开始：** 先调 `overview`，看上次的中断点、待办与生效中的决策；再用 `review_candidates` 或 `get_node` 选本轮任务。用户说"继续"时据此直接开始。标记为 stale 的待办决策（做出决策后状态又被重新评估过），执行前先看 `get_node`：仍然适用才执行，否则用 `update_decision` 撤销并写原因，不要照旧执行过时的决策。
 - **建节点：** 新知识点用 `upsert_node`，先修、包含、易混淆关系用 `link_nodes`。
 - **公式写法：** 写进知识库的任何文字（定义、直觉、易错点、证据备注、理由等）中的公式一律用 LaTeX，并加定界符：行内 `$\sigma(z)=\frac{1}{1+e^{-z}}$`，独立成行 `$$…$$`。阅览网页只渲染带定界符的 LaTeX；不要写 `wᵀx`、`e^{w_j}`、`Σ` 这类裸露的 Unicode 或未加定界符的记号。
 - **讲解时：** 讲完一次记 `record_evidence`（kind=exposure，填 representation）；穿插的检验记 kind=prediction，填 outcome、representation，并在 interpretation 写下学生实际理解成了什么。讲新内容前看 `get_node` 的 representations_tried，遵守"同一表征连续两次失败就换"。
@@ -224,7 +224,8 @@ description: 面向多门课程、考试导向与学习时间有限的用户，�
 - **状态：** 用 `assess_state` 写七种状态之一（unknown、exposed、assisted、independent、validated、weak、recheck），必须引用该节点的证据 id 并写理由；先参考 rule_baseline，偏离时说明原因。
 - **考核价值：** 用 `estimate_value` 按"节点 × 考核目标"估计，写依据、来源和不确定性；没有资料就留空，不得凭空标为必考。
 - **决策：** 用 `decide` 记录下一步或"学/略读/跳过"，写理由和适用条件；新证据推翻时用 `update_decision` 撤销并写原因。
-- **结束：** 用 `end_session` 写上面的微型学习记录。
+- **执行完就关闭决策：** 决策一旦执行（讲完了 explain、做完了 practice / retest），必须在同一轮把它关掉：最简单的是在对应的 `record_evidence` 或 `record_attempt` 里传 `executes_decision_id`，或者单独调用 `update_decision`（status=done，写 outcome）。`record_*` 和 `assess_state` 返回 open_decisions 时，逐条判断：刚执行的关掉，被新状态推翻的撤销，仍然适用的才保留。
+- **结束：** 用 `end_session` 写上面的微型学习记录；它若返回 unclosed_decisions，先处理完再结束，保证库里不留已执行却仍是 planned 的决策。
 
 工具调用不应打断学习节奏：记录在学生作答之后、讲解之间进行，不必向学生逐条播报。未连接知识库时，必要时请用户复制上一轮的微型记录。
 

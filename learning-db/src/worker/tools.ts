@@ -87,6 +87,43 @@ async function mustExist(env: Env, table: string, id: number, label = table): Pr
   return row;
 }
 
+// ---------- decision bookkeeping ----------
+
+// A planned decision is stale when the node's state was re-assessed after the decision was made.
+const STALE_SQL = `(d.status = 'planned' AND EXISTS (SELECT 1 FROM knowledge_states k WHERE k.node_id = d.node_id AND k.assessed_at > d.decided_at))`;
+
+async function plannedFor(env: Env, nodeIds: number[]) {
+  if (!nodeIds.length) return [];
+  return all(
+    env,
+    `SELECT d.id, d.node_id, d.action, d.reason, d.decided_at, ${STALE_SQL} AS stale
+     FROM decisions d WHERE d.status = 'planned' AND d.node_id IN (${nodeIds.map(() => '?').join(',')})
+     ORDER BY d.decided_at`,
+    ...nodeIds,
+  );
+}
+
+async function completeDecision(env: Env, decisionId: number, nodeIds: number[], sessionId: number | null, outcome: string | null) {
+  const d = await mustExist(env, 'decisions', decisionId, 'decision');
+  if (d.status !== 'planned') throw new ToolError(`decision ${decisionId} is ${d.status}, not planned`);
+  if (d.node_id !== null && !nodeIds.includes(d.node_id as number))
+    throw new ToolError(`decision ${decisionId} is about node ${d.node_id}, not the node(s) recorded here`);
+  await env.DB.prepare(
+    `UPDATE decisions SET status = 'done', done_session = COALESCE(?, done_session), outcome = COALESCE(?, outcome) WHERE id = ?`,
+  )
+    .bind(sessionId, outcome, decisionId)
+    .run();
+  return decisionId;
+}
+
+const CLOSE_HINT =
+  'These planned decisions on the same node(s) are still open. If one was just carried out, close it with update_decision (status done, with outcome); if new evidence makes it unnecessary, revoke it with a reason. Leave it only if it still applies.';
+
+const executesSchema = {
+  executes_decision_id: int('Id of the planned decision this activity carried out; it is marked done'),
+  decision_outcome: str('What came of carrying out that decision'),
+};
+
 // ---------- read operations (shared with the web API) ----------
 
 export async function overview(env: Env, courseId: number | null) {
@@ -110,8 +147,9 @@ export async function overview(env: Env, courseId: number | null) {
   );
   const decisions = await all(
     env,
-    `SELECT id, node_id, title, course_id, assessment_id, action, reason, condition, priority, status, exam_value, decided_at
-     FROM open_decisions ${courseId ? 'WHERE course_id = ? OR node_id IN (SELECT id FROM nodes WHERE course_id = ?)' : ''}
+    `SELECT d.id, d.node_id, d.title, d.course_id, d.assessment_id, d.action, d.reason, d.condition, d.priority, d.status,
+            d.exam_value, d.decided_at, ${STALE_SQL} AS stale
+     FROM open_decisions d ${courseId ? 'WHERE d.course_id = ? OR d.node_id IN (SELECT id FROM nodes WHERE course_id = ?)' : ''}
      LIMIT 30`,
     ...(courseId ? [courseId, courseId] : []),
   );
@@ -185,7 +223,7 @@ export async function nodeDetail(env: Env, nodeId: number) {
        WHERE e.node_id = ? ORDER BY e.observed_at DESC, e.id DESC LIMIT 20`,
       nodeId,
     ),
-    all(env, `SELECT * FROM decisions WHERE node_id = ? ORDER BY decided_at DESC, id DESC LIMIT 10`, nodeId),
+    all(env, `SELECT d.*, ${STALE_SQL} AS stale FROM decisions d WHERE d.node_id = ? ORDER BY d.decided_at DESC, d.id DESC LIMIT 10`, nodeId),
     first(env, `SELECT * FROM rule_baseline WHERE node_id = ?`, nodeId),
     // How each way of explaining has gone so far: the following prediction/step outcomes after it was used
     all(
@@ -220,7 +258,7 @@ export const TOOLS: Tool[] = [
     name: 'overview',
     readOnly: true,
     description:
-      'Start here. Lists courses with their assessments (exams), how many nodes sit in each knowledge state, open/active teaching decisions, and the last few session summaries (where the student stopped).',
+      'Start here. Lists courses with their assessments (exams), how many nodes sit in each knowledge state, open/active teaching decisions, and the last few session summaries (where the student stopped). A decision with stale=1 is planned but the node was re-assessed after it was made: before acting on it, check get_node and either carry it out, or close/revoke it with update_decision.',
     inputSchema: obj({ course_id: int('Limit to one course') }),
     run: (env, a) => overview(env, opt<number>(a, 'course_id')),
   },
@@ -449,18 +487,22 @@ export const TOOLS: Tool[] = [
   {
     name: 'end_session',
     description:
-      'Save the short end-of-session record: what was done, independent performance, where to start next time, what can be skipped for now.',
+      'Save the short end-of-session record: what was done, independent performance, where to start next time, what can be skipped for now. Returns any planned decisions on nodes studied in this session that are still open; close or revoke them before finishing.',
     inputSchema: obj({ session_id: int('Session id'), summary: str('Micro learning record') }, ['session_id', 'summary']),
     run: async (env, a) => {
       await mustExist(env, 'sessions', need<number>(a, 'session_id'), 'session');
       await env.DB.prepare('UPDATE sessions SET summary = ? WHERE id = ?').bind(need(a, 'summary'), a.session_id).run();
-      return { ok: true };
+      const touched = await all<{ node_id: number }>(env, 'SELECT DISTINCT node_id FROM evidence WHERE session_id = ?', a.session_id);
+      const open = await plannedFor(env, touched.map((t) => t.node_id));
+      return open.length
+        ? { ok: true, unclosed_decisions: open, hint: 'Nodes studied in this session still have planned decisions. ' + CLOSE_HINT }
+        : { ok: true };
     },
   },
   {
     name: 'record_attempt',
     description:
-      'Record one answered question. Describe the question as a task with steps, each step mapped to the node it exercises (core = what the question mainly tests, supporting = used along the way). Then give one result per step: demonstrated, failed, not_reached (never got there: no evidence either way) or unclear. A wrong answer only counts against the step that actually failed. Use qualifier guessed for a correct-but-guessed step and slip for a mere slip. confidence and self_signal are optional: fill them only if the student was asked or volunteered it; never invent them. Pass task_id instead of task to reuse a known question.',
+      'Record one answered question. Describe the question as a task with steps, each step mapped to the node it exercises (core = what the question mainly tests, supporting = used along the way). Then give one result per step: demonstrated, failed, not_reached (never got there: no evidence either way) or unclear. A wrong answer only counts against the step that actually failed. Use qualifier guessed for a correct-but-guessed step and slip for a mere slip. confidence and self_signal are optional: fill them only if the student was asked or volunteered it; never invent them. Pass task_id instead of task to reuse a known question. If this question carried out a planned decision (e.g. a retest or practice), pass executes_decision_id to mark it done in the same call.',
     inputSchema: obj(
       {
         session_id: int('Session id'),
@@ -489,6 +531,7 @@ export const TOOLS: Tool[] = [
         self_signal: oneOf(SELF_SIGNALS, 'Only if the student said it'),
         seconds_spent: int('Time spent'),
         note: str('Note'),
+        ...executesSchema,
         step_results: {
           type: 'array',
           description: 'One entry per task step',
@@ -604,13 +647,23 @@ export const TOOLS: Tool[] = [
             diffs.map((d) => env.DB.prepare('INSERT OR IGNORE INTO evidence_difficulties VALUES (?, ?)').bind(id, d)),
           );
       }
-      return { task_id: taskId, attempt_id: attemptId, evidence_ids_by_step: evidenceIds };
+      const nodeIds = [...new Set(steps.map((s) => s.node_id))];
+      const exec = opt<number>(a, 'executes_decision_id');
+      const closed = exec ? await completeDecision(env, exec, nodeIds, sessionId, opt(a, 'decision_outcome')) : null;
+      const open = await plannedFor(env, nodeIds);
+      return {
+        task_id: taskId,
+        attempt_id: attemptId,
+        evidence_ids_by_step: evidenceIds,
+        ...(closed ? { closed_decision: closed } : {}),
+        ...(open.length ? { open_decisions: open, hint: CLOSE_HINT } : {}),
+      };
     },
   },
   {
     name: 'record_evidence',
     description:
-      'Record evidence that is not a full answered question. exposure: the student was taught or read it; give representation (which way it was explained). prediction: a quick embedded check during teaching (predict, classify, judge an instance, give a counterexample); give outcome, representation and, above all, interpretation. self_explain: explained it in their own words; give outcome. self_report: student says they get it or not; weakest evidence. interpretation = what rule the student actually seems to be using, in particular a misreading (e.g. 以为边际分布相同就严格平稳).',
+      'Record evidence that is not a full answered question. exposure: the student was taught or read it; give representation (which way it was explained). prediction: a quick embedded check during teaching (predict, classify, judge an instance, give a counterexample); give outcome, representation and, above all, interpretation. self_explain: explained it in their own words; give outcome. self_report: student says they get it or not; weakest evidence. interpretation = what rule the student actually seems to be using, in particular a misreading (e.g. 以为边际分布相同就严格平稳). If this carried out a planned decision (e.g. the explanation an explain decision called for), pass executes_decision_id to mark it done in the same call.',
     inputSchema: obj(
       {
         node_id: nodeId,
@@ -622,6 +675,7 @@ export const TOOLS: Tool[] = [
         interpretation: str('What the student took the rule to be'),
         difficulties: { type: 'array', items: oneOf(DIFFICULTIES, 'Learning difficulty') },
         note: str('What was observed'),
+        ...executesSchema,
       },
       ['node_id', 'kind'],
     ),
@@ -649,13 +703,20 @@ export const TOOLS: Tool[] = [
       for (const d of diffs) inEnum(d, DIFFICULTIES, 'difficulty');
       if (diffs.length)
         await env.DB.batch(diffs.map((d) => env.DB.prepare('INSERT OR IGNORE INTO evidence_difficulties VALUES (?, ?)').bind(id, d)));
-      return { evidence_id: id };
+      const exec = opt<number>(a, 'executes_decision_id');
+      const closed = exec ? await completeDecision(env, exec, [a.node_id as number], opt(a, 'session_id'), opt(a, 'decision_outcome')) : null;
+      const open = await plannedFor(env, [a.node_id as number]);
+      return {
+        evidence_id: id,
+        ...(closed ? { closed_decision: closed } : {}),
+        ...(open.length ? { open_decisions: open, hint: CLOSE_HINT } : {}),
+      };
     },
   },
   {
     name: 'assess_state',
     description:
-      'Write a new knowledge-state judgement for a node (appended; history is kept). level: unknown, exposed, assisted, independent, validated, weak, recheck. basis must list the evidence ids it rests on (from this node), except for unknown. Check get_node\'s rule_baseline first and explain in rationale when you deviate from it.',
+      'Write a new knowledge-state judgement for a node (appended; history is kept). level: unknown, exposed, assisted, independent, validated, weak, recheck. basis must list the evidence ids it rests on (from this node), except for unknown. Check get_node\'s rule_baseline first and explain in rationale when you deviate from it. Returns the node\'s still-planned decisions: review each against the new state and close, revoke or keep it.',
     inputSchema: obj(
       {
         node_id: nodeId,
@@ -694,7 +755,10 @@ export const TOOLS: Tool[] = [
         need(a, 'rationale'),
         opt(a, 'assessed_by') ?? 'ai',
       );
-      return { state_id: id };
+      const open = await plannedFor(env, [node]);
+      return open.length
+        ? { state_id: id, open_decisions: open, hint: 'The state just changed. ' + CLOSE_HINT }
+        : { state_id: id };
     },
   },
   {

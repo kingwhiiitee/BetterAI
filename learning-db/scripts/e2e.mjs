@@ -98,3 +98,21 @@ const api = await fetch(BASE + `/api/courses/${course_id}`, { headers: { authori
 const tree = await api.json();
 check(api.status === 200 && tree.nodes.length === 5 && tree.edges.length === 1, 'web API course tree');
 check((await fetch(BASE + '/api/overview')).status === 401, 'web API needs token');
+
+// decision bookkeeping
+const ex = await call('record_evidence', { node_id: ids['链式法则'], kind: 'exposure', representation: 'graph', session_id, executes_decision_id: d3.decision_id, decision_outcome: '用计算图重讲' });
+check(ex.closed_decision === d3.decision_id, 'executes_decision_id closes the decision in the same call');
+check(!!(await call('record_evidence', { node_id: ids['前向传播'], kind: 'exposure', executes_decision_id: d3.decision_id })).error, 'cannot close an already-done decision');
+const d4 = await call('decide', { node_id: ids['链式法则'], assessment_id, action: 'retest', reason: '隔天复测', priority: 2 });
+check(!!(await call('record_evidence', { node_id: ids['前向传播'], kind: 'exposure', executes_decision_id: d4.decision_id })).error, 'cannot close a decision about another node');
+await new Promise((r) => setTimeout(r, 1100));
+const pe = await call('record_evidence', { node_id: ids['链式法则'], kind: 'prediction', outcome: 'demonstrated', representation: 'graph', session_id });
+check(pe.open_decisions?.some((d) => d.id === d4.decision_id), 'recording evidence lists open decisions on the node');
+const st2 = await call('assess_state', { node_id: ids['链式法则'], level: 'assisted', rationale: '图示后能判断', basis: [pe.evidence_id] });
+check(st2.open_decisions?.length === 1 && st2.hint, 'assess_state lists planned decisions to review');
+const ov2 = await call('overview', {});
+check(ov2.open_decisions.find((d) => d.id === d4.decision_id)?.stale === 1, 'overview flags the decision as stale after a newer state');
+const es = await call('end_session', { session_id, summary: '第二段' });
+check(es.unclosed_decisions?.[0]?.id === d4.decision_id, 'end_session reports unclosed decisions on studied nodes');
+await call('update_decision', { decision_id: d4.decision_id, status: 'done', outcome: '复测通过' });
+check(!(await call('end_session', { session_id, summary: '第二段' })).unclosed_decisions, 'nothing reported once closed');
