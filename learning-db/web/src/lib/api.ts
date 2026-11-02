@@ -97,6 +97,7 @@ export interface OpenDecision {
   status: string;
   exam_value: number | null;
   decided_at: string;
+  stale?: number | null;
 }
 
 export interface Session {
@@ -206,6 +207,7 @@ export interface DecisionRow {
   revoked_at: string | null;
   revoked_why: string | null;
   outcome: string | null;
+  stale?: number | null;
 }
 
 export interface NodeDetail {
@@ -214,6 +216,7 @@ export interface NodeDetail {
     course_id: number;
     title: string;
     kind: string;
+    usage?: string | null;
     definition: string | null;
     intuition: string | null;
     boundary: string | null;

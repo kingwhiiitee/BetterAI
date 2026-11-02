@@ -35,8 +35,9 @@ export function NodePage({ id }: { id: number }) {
   if (error || !data) return <ErrorCard error={error!} />;
   const { node, current_state: cs, rule_baseline: rb } = data;
   const facts = [
-    ["定义", node.definition],
+    ["用途与用法", node.usage],
     ["直觉", node.intuition],
+    ["定义", node.definition],
     ["适用条件 / 反例", node.boundary],
     ["常见易错点", node.pitfalls],
   ].filter(([, v]) => v) as [string, string][];
@@ -202,6 +203,7 @@ export function NodePage({ id }: { id: number }) {
                         </span>
                         <span className="text-caption-1-regular text-text-tertiary">
                           {DECISION_STATUS[d.status]} · {fmtTime(d.decided_at, false)}
+                          {d.stale && d.status === "planned" ? <StaleBadge /> : null}
                           {d.condition ? ` · 条件：${d.condition}` : ""}
                         </span>
                         {d.revoked_why ? (
@@ -242,6 +244,14 @@ export function NodePage({ id }: { id: number }) {
         </div>
       </div>
     </>
+  );
+}
+
+function StaleBadge() {
+  return (
+    <Chip variant="caption" color="yellow" className="ms-1.5" title="做出这条决策后，这个知识点的状态又被重新评估过">
+      可能已过时
+    </Chip>
   );
 }
 
