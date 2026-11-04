@@ -23,7 +23,9 @@ interface Tool {
 // ---------- enums (must match schema.sql) ----------
 
 const KINDS = ['concept', 'definition', 'theorem', 'formula', 'method', 'problem_type'];
-const RELATIONS = ['prerequisite_of', 'part_of', 'confused_with', 'contrasts_with'];
+const RELATIONS = ['prerequisite_of', 'part_of', 'confused_with', 'contrasts_with', 'analogous_to'];
+const LAYERS = ['use', 'mechanism', 'principle', 'boundary'];
+const COURSE_KINDS = ['course', 'foundation'];
 const TASK_SOURCES = ['past_paper', 'textbook', 'homework', 'teacher_sample', 'ai_generated'];
 const FORMATS = ['choice', 'fill', 'calculation', 'proof', 'short_answer', 'other'];
 const CONTEXTS = ['right_after_teaching', 'delayed', 'mixed', 'timed', 'unseen_variant'];
@@ -187,9 +189,23 @@ export async function courseTree(env: Env, courseId: number) {
      JOIN nodes n ON n.id = v.node_id WHERE n.course_id = ?`,
     courseId,
   );
+  // Edges touching this course, including links to nodes of other courses (cross-subject prerequisites, analogies)
   const edges = await all(
     env,
-    `SELECT e.* FROM edges e JOIN nodes n ON n.id = e.from_id WHERE n.course_id = ?`,
+    `SELECT e.* FROM edges e
+     WHERE e.from_id IN (SELECT id FROM nodes WHERE course_id = ?) OR e.to_id IN (SELECT id FROM nodes WHERE course_id = ?)`,
+    courseId,
+    courseId,
+  );
+  const external = await all(
+    env,
+    `SELECT n.id, n.title, n.kind, n.course_id, c.name AS course, c.subject, s.level
+     FROM nodes n JOIN courses c ON c.id = n.course_id JOIN current_state s ON s.node_id = n.id
+     WHERE n.course_id <> ? AND n.id IN (
+       SELECT e.from_id FROM edges e JOIN nodes t ON t.id = e.to_id WHERE t.course_id = ?
+       UNION SELECT e.to_id FROM edges e JOIN nodes f ON f.id = e.from_id WHERE f.course_id = ?)`,
+    courseId,
+    courseId,
     courseId,
   );
   const scope = await all(
@@ -199,14 +215,22 @@ export async function courseTree(env: Env, courseId: number) {
        AND node_id IN (SELECT id FROM nodes WHERE course_id = ?)`,
     courseId,
   );
-  return { course, assessments, nodes, values, edges, scope_decisions: scope };
+  return { course, assessments, nodes, values, edges, external_nodes: external, scope_decisions: scope };
 }
 
+const EDGE_COLS = `e.relation, e.note, e.weight, e.needed_layer, n.id AS node_id, n.title, n.course_id, c.name AS course, c.subject, s.level`;
+const EDGE_JOIN = `JOIN courses c ON c.id = n.course_id JOIN current_state s ON s.node_id = n.id`;
+
 export async function nodeDetail(env: Env, nodeId: number) {
-  const node = await mustExist(env, 'nodes', nodeId, 'node');
+  const node = await first(
+    env,
+    `SELECT n.*, c.name AS course, c.subject, c.kind AS course_kind FROM nodes n JOIN courses c ON c.id = n.course_id WHERE n.id = ?`,
+    nodeId,
+  );
+  if (!node) throw new ToolError(`node ${nodeId} not found`);
   const [edgesOut, edgesIn, states, values, evidence, decisions, baseline, representations] = await Promise.all([
-    all(env, `SELECT e.relation, e.note, e.to_id AS node_id, n.title FROM edges e JOIN nodes n ON n.id = e.to_id WHERE e.from_id = ?`, nodeId),
-    all(env, `SELECT e.relation, e.note, e.from_id AS node_id, n.title FROM edges e JOIN nodes n ON n.id = e.from_id WHERE e.to_id = ?`, nodeId),
+    all(env, `SELECT ${EDGE_COLS} FROM edges e JOIN nodes n ON n.id = e.to_id ${EDGE_JOIN} WHERE e.from_id = ?`, nodeId),
+    all(env, `SELECT ${EDGE_COLS} FROM edges e JOIN nodes n ON n.id = e.from_id ${EDGE_JOIN} WHERE e.to_id = ?`, nodeId),
     all(env, `SELECT * FROM knowledge_states WHERE node_id = ? ORDER BY assessed_at DESC, id DESC LIMIT 8`, nodeId),
     all(env, `SELECT v.*, a.name AS assessment FROM current_values v JOIN assessments a ON a.id = v.assessment_id WHERE v.node_id = ?`, nodeId),
     all(
@@ -249,6 +273,149 @@ export async function nodeDetail(env: Env, nodeId: number) {
   };
 }
 
+// ---------- prerequisite chain ----------
+
+const LEVEL_RANK: Record<string, number> = { unknown: 0, exposed: 1, assisted: 2, independent: 3, validated: 4 };
+// How far a prerequisite must be mastered, by the (path) weight of the link
+const REQUIRED_LEVEL: Record<number, string> = { 3: 'independent', 2: 'assisted', 1: 'exposed' };
+const LAYER_SQL = `CASE e.needed_layer WHEN 'use' THEN 1 WHEN 'mechanism' THEN 2 WHEN 'principle' THEN 3 WHEN 'boundary' THEN 4 ELSE 0 END`;
+
+function prereqStatus(level: string, lastSeen: unknown, pathWeight: number): 'ok' | 'gap' | 'unverified' {
+  if (level === 'weak') return 'gap';
+  if (level === 'recheck') return 'unverified';
+  if (level === 'unknown' && !lastSeen) return pathWeight >= 2 ? 'unverified' : 'ok';
+  return (LEVEL_RANK[level] ?? 0) >= LEVEL_RANK[REQUIRED_LEVEL[pathWeight]] ? 'ok' : 'gap';
+}
+
+export async function prerequisiteChain(
+  env: Env,
+  nodeId: number,
+  opts: { layer?: string | null; minWeight?: number | null; maxDepth?: number | null } = {},
+) {
+  const target = await first<Json>(
+    env,
+    `SELECT n.id, n.title, n.course_id, c.name AS course, c.subject, n.prereqs_reviewed_at, s.level
+     FROM nodes n JOIN courses c ON c.id = n.course_id JOIN current_state s ON s.node_id = n.id WHERE n.id = ?`,
+    nodeId,
+  );
+  if (!target) throw new ToolError(`node ${nodeId} not found`);
+  const layer = opts.layer ?? 'boundary';
+  inEnum(layer, LAYERS, 'layer');
+  const layerRank = LAYERS.indexOf(layer) + 1;
+  const minWeight = Math.max(1, Math.min(opts.minWeight ?? 1, 3));
+  const maxDepth = Math.max(1, Math.min(opts.maxDepth ?? 4, 8));
+
+  // Walk prerequisite_of edges upstream. The layer filter applies to the first hop (what this round's
+  // explanation depth needs); further up, everything a needed prerequisite rests on counts.
+  const rows = await all<{ node_id: number; child_id: number; depth: number; weight: number; path_weight: number; needed_layer: string | null; note: string | null }>(
+    env,
+    `WITH RECURSIVE chain(node_id, child_id, depth, weight, path_weight, needed_layer, note, path) AS (
+       SELECT e.from_id, e.to_id, 1, e.weight, e.weight, e.needed_layer, e.note, ',' || e.to_id || ',' || e.from_id || ','
+       FROM edges e WHERE e.to_id = ? AND e.relation = 'prerequisite_of' AND e.weight >= ? AND ${LAYER_SQL} <= ?
+       UNION ALL
+       SELECT e.from_id, e.to_id, c.depth + 1, e.weight, min(c.path_weight, e.weight), e.needed_layer, e.note, c.path || e.from_id || ','
+       FROM chain c JOIN edges e ON e.to_id = c.node_id AND e.relation = 'prerequisite_of'
+       WHERE c.depth < ? AND e.weight >= ? AND instr(c.path, ',' || e.from_id || ',') = 0
+     )
+     SELECT node_id, child_id, depth, weight, path_weight, needed_layer, note FROM chain LIMIT 1000`,
+    nodeId,
+    minWeight,
+    layerRank,
+    maxDepth,
+    minWeight,
+  );
+
+  const agg = new Map<number, { depth: number; path_weight: number; needed_for: Json[] }>();
+  for (const r of rows) {
+    const a = agg.get(r.node_id) ?? { depth: 0, path_weight: 0, needed_for: [] };
+    a.depth = Math.max(a.depth, r.depth);
+    a.path_weight = Math.max(a.path_weight, r.path_weight);
+    if (!a.needed_for.some((x) => x.node_id === r.child_id))
+      a.needed_for.push({ node_id: r.child_id, weight: r.weight, needed_layer: r.needed_layer, note: r.note });
+    agg.set(r.node_id, a);
+  }
+  const ids = [...agg.keys()];
+  const info = ids.length
+    ? await all<Json>(
+        env,
+        `SELECT n.id, n.title, n.kind, n.course_id, c.name AS course, c.subject, n.prereqs_reviewed_at, s.level, b.last_seen,
+           (SELECT COUNT(*) FROM edges e WHERE e.to_id = n.id AND e.relation = 'prerequisite_of') AS own_prereqs
+         FROM nodes n JOIN courses c ON c.id = n.course_id JOIN current_state s ON s.node_id = n.id
+         JOIN rule_baseline b ON b.node_id = n.id
+         WHERE n.id IN (${ids.map(() => '?').join(',')})`,
+        ...ids,
+      )
+    : [];
+  const prerequisites = info
+    .map((n) => {
+      const a = agg.get(n.id as number)!;
+      return {
+        node_id: n.id,
+        title: n.title,
+        kind: n.kind,
+        course_id: n.course_id,
+        course: n.course,
+        subject: n.subject,
+        cross_course: n.course_id !== target.course_id,
+        depth: a.depth,
+        path_weight: a.path_weight,
+        required_level: REQUIRED_LEVEL[a.path_weight],
+        level: n.level,
+        last_seen: n.last_seen,
+        status: prereqStatus(String(n.level), n.last_seen, a.path_weight),
+        chain_reviewed: !!n.prereqs_reviewed_at,
+        needed_for: a.needed_for,
+        // Only reported where the walk stopped at max_depth although the node has prerequisites of its own
+        truncated: a.depth >= maxDepth && Number(n.own_prereqs) > 0 ? true : undefined,
+      };
+    })
+    // Deepest first is a valid teaching order on a DAG: a prerequisite always sits deeper than what it serves.
+    .sort((x, y) => y.depth - x.depth || y.path_weight - x.path_weight || Number(x.node_id) - Number(y.node_id));
+
+  const teachOrder = prerequisites.filter((p) => p.status !== 'ok');
+  const unreviewed = prerequisites.filter((p) => !p.chain_reviewed && p.path_weight >= 2).map((p) => p.node_id);
+  const hints: string[] = [];
+  if (!target.prereqs_reviewed_at)
+    hints.push(
+      prerequisites.length
+        ? 'The chain of this node has not been confirmed complete. Check that every prerequisite is linked (with weight and needed_layer), then call upsert_node with prereqs_reviewed=true.'
+        : 'No prerequisites are recorded and the chain was never reviewed. Before explaining, work out what this node builds on, searching all courses with find_nodes (prerequisites often come from another subject); create missing ones with upsert_node (in a foundation course of their own subject when they belong to another discipline), link them with link_nodes (weight, needed_layer), then call upsert_node with prereqs_reviewed=true. If it truly needs nothing, just mark it reviewed.',
+    );
+  if (teachOrder.some((p) => p.status === 'unverified'))
+    hints.push('unverified: no or outdated evidence. Run a 1-question check on these (weight 3 first) instead of assuming either way.');
+  if (teachOrder.some((p) => p.status === 'gap'))
+    hints.push('gap: below required_level. Repair these in teach_order (deepest first) before the target, only to the layer the target needs.');
+  if (unreviewed.length)
+    hints.push(`Prerequisites ${unreviewed.join(', ')} have not had their own chains reviewed; the chain above them may be incomplete.`);
+
+  return {
+    target,
+    layer,
+    min_weight: minWeight,
+    max_depth: maxDepth,
+    prerequisites,
+    teach_order: teachOrder.map((p) => ({ node_id: p.node_id, title: p.title, course: p.course, status: p.status, required_level: p.required_level, level: p.level })),
+    ready: target.prereqs_reviewed_at !== null && !teachOrder.length,
+    ...(hints.length ? { hint: hints.join(' ') } : {}),
+  };
+}
+
+// Short notice attached to teaching writes: is the chain set up, and are essential direct prerequisites missing?
+async function chainNotice(env: Env, nodeId: number) {
+  const c = await prerequisiteChain(env, nodeId, { minWeight: 2, maxDepth: 1 });
+  const gaps = c.teach_order.filter((p) => c.prerequisites.find((q) => q.node_id === p.node_id)?.path_weight === 3);
+  if (c.target.prereqs_reviewed_at && !gaps.length) return null;
+  return {
+    prerequisite_chain: {
+      reviewed: !!c.target.prereqs_reviewed_at,
+      essential_gaps: gaps,
+      hint: !c.target.prereqs_reviewed_at
+        ? 'This node\'s prerequisite chain has not been set up. Call prerequisite_chain on it before (further) explaining.'
+        : 'Essential (weight 3) prerequisites are not in place; repair them first or explain why it is fine to go on.',
+    },
+  };
+}
+
 // ---------- tools ----------
 
 const nodeId = int('Knowledge node id (look it up with find_nodes)');
@@ -265,10 +432,12 @@ export const TOOLS: Tool[] = [
   {
     name: 'find_nodes',
     readOnly: true,
-    description: 'Search knowledge nodes by title substring, course and/or current state level.',
+    description:
+      'Search knowledge nodes by title substring, course, subject and/or current state level. Omit course_id to search every course: prerequisites and analogies often live in another course or subject.',
     inputSchema: obj({
       query: str('Substring of the node title'),
       course_id: int('Course id'),
+      subject: str('Subject of the course, e.g. 数学'),
       level: oneOf(LEVELS, 'Only nodes currently in this state'),
       limit: int('Max rows, default 30'),
     }),
@@ -280,13 +449,15 @@ export const TOOLS: Tool[] = [
       if (q) (where.push('n.title LIKE ?'), params.push(`%${q}%`));
       const c = opt<number>(a, 'course_id');
       if (c) (where.push('n.course_id = ?'), params.push(c));
+      const sub = opt<string>(a, 'subject');
+      if (sub) (where.push('co.subject = ?'), params.push(sub));
       const l = opt<string>(a, 'level');
       if (l) (where.push('s.level = ?'), params.push(l));
       params.push(Math.min(opt<number>(a, 'limit') ?? 30, 200));
       return all(
         env,
-        `SELECT n.id, n.course_id, n.title, n.kind, s.level, s.assessed_at
-         FROM nodes n JOIN current_state s ON s.node_id = n.id
+        `SELECT n.id, n.course_id, co.name AS course, co.subject, n.title, n.kind, s.level, s.assessed_at
+         FROM nodes n JOIN current_state s ON s.node_id = n.id JOIN courses co ON co.id = n.course_id
          ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY n.course_id, n.id LIMIT ?`,
         ...params,
       );
@@ -299,6 +470,27 @@ export const TOOLS: Tool[] = [
       'Everything about one node: its facts, related nodes, current state and history, exam value per assessment, the most recent evidence (with task, step, context, hints, difficulty tags, representation and the student interpretation), which representations have been tried and how many embedded checks failed after each, decisions, and the mechanical rule_baseline suggestion.',
     inputSchema: obj({ node_id: nodeId }, ['node_id']),
     run: (env, a) => nodeDetail(env, need<number>(a, 'node_id')),
+  },
+  {
+    name: 'prerequisite_chain',
+    readOnly: true,
+    description:
+      'Call before explaining a node. Walks prerequisite_of links upstream (across courses and subjects) and, for each prerequisite, gives depth, path_weight (weakest link on the strongest path; 3 essential, 2 important, 1 helpful), required_level (weight 3 → independent, 2 → assisted, 1 → exposed), current level and status: ok, gap (below required) or unverified (no or outdated evidence). teach_order lists what to check or repair first, deepest first. layer = how deep this round will go (use, mechanism, principle, boundary): links whose needed_layer is deeper are left out. ready=true means the chain was reviewed and nothing needs repair. If it says the chain was never reviewed, build it first.',
+    inputSchema: obj(
+      {
+        node_id: nodeId,
+        layer: oneOf(LAYERS, 'Deepest explanation layer planned this round; default boundary (everything)'),
+        min_weight: int('Ignore links lighter than this (1–3); default 1'),
+        max_depth: int('How many links upstream; default 4'),
+      },
+      ['node_id'],
+    ),
+    run: (env, a) =>
+      prerequisiteChain(env, need<number>(a, 'node_id'), {
+        layer: opt<string>(a, 'layer'),
+        minWeight: opt<number>(a, 'min_weight'),
+        maxDepth: opt<number>(a, 'max_depth'),
+      }),
   },
   {
     name: 'review_candidates',
@@ -337,18 +529,33 @@ export const TOOLS: Tool[] = [
   },
   {
     name: 'upsert_course',
-    description: 'Create a course, or update its status if a course with this name exists. Returns its id.',
-    inputSchema: obj({ name: str('Course name'), status: oneOf(['active', 'paused', 'done'], 'Default active') }, ['name']),
+    description:
+      'Create a course, or update it if a course with this name exists. Returns its id. kind=foundation makes a shared knowledge base for one subject (e.g. 线性代数基础, 概率论基础) that other courses link into, instead of copying basics into every course.',
+    inputSchema: obj(
+      {
+        name: str('Course name'),
+        status: oneOf(['active', 'paused', 'done'], 'Default active'),
+        subject: str('Discipline, e.g. 数学 / 统计 / 计算机 / 经济 / 日语'),
+        kind: oneOf(COURSE_KINDS, 'course (has exams; default) or foundation (shared subject basics)'),
+      },
+      ['name'],
+    ),
     run: async (env, a) => {
       const status = opt<string>(a, 'status');
       inEnum(status, ['active', 'paused', 'done'], 'status');
+      inEnum(opt(a, 'kind'), COURSE_KINDS, 'kind');
       const row = await first<{ id: number }>(
         env,
-        `INSERT INTO courses (name, status) VALUES (?, COALESCE(?, 'active'))
-         ON CONFLICT(name) DO UPDATE SET status = COALESCE(excluded.status, courses.status)
+        `INSERT INTO courses (name, status, subject, kind) VALUES (?, COALESCE(?, 'active'), ?, COALESCE(?, 'course'))
+         ON CONFLICT(name) DO UPDATE SET status = COALESCE(?, courses.status),
+           subject = COALESCE(excluded.subject, courses.subject), kind = COALESCE(?, courses.kind)
          RETURNING id`,
         need<string>(a, 'name'),
         status,
+        opt(a, 'subject'),
+        opt(a, 'kind'),
+        status,
+        opt(a, 'kind'),
       );
       return { course_id: row?.id };
     },
@@ -406,6 +613,10 @@ export const TOOLS: Tool[] = [
         intuition: str('Intuitive explanation'),
         boundary: str('Conditions and counterexamples'),
         pitfalls: str('Common mistakes in general, not this student\'s'),
+        prereqs_reviewed: {
+          type: 'boolean',
+          description: 'true once all prerequisites of this node are linked (or it truly needs none); false to reopen',
+        },
       },
       ['course_id', 'title', 'kind'],
     ),
@@ -422,7 +633,8 @@ export const TOOLS: Tool[] = [
            definition = COALESCE(excluded.definition, nodes.definition),
            intuition = COALESCE(excluded.intuition, nodes.intuition),
            boundary = COALESCE(excluded.boundary, nodes.boundary),
-           pitfalls = COALESCE(excluded.pitfalls, nodes.pitfalls)
+           pitfalls = COALESCE(excluded.pitfalls, nodes.pitfalls),
+           prereqs_reviewed_at = CASE ? WHEN 1 THEN datetime('now') WHEN 0 THEN NULL ELSE nodes.prereqs_reviewed_at END
          RETURNING id`,
         a.course_id,
         need<string>(a, 'title'),
@@ -432,41 +644,88 @@ export const TOOLS: Tool[] = [
         opt(a, 'intuition'),
         opt(a, 'boundary'),
         opt(a, 'pitfalls'),
+        a.prereqs_reviewed === true ? 1 : a.prereqs_reviewed === false ? 0 : null,
       );
+      // A brand-new node marked reviewed in the same call: the INSERT branch does not run the CASE above
+      if (a.prereqs_reviewed === true)
+        await env.DB.prepare(`UPDATE nodes SET prereqs_reviewed_at = datetime('now') WHERE id = ?`).bind(row?.id).run();
       return { node_id: row?.id };
     },
   },
   {
     name: 'link_nodes',
     description:
-      'Add (or with remove=true delete) a relation between two nodes. prerequisite_of: from is needed before to. part_of: from is a part of to. confused_with / contrasts_with: easily mixed up or worth contrasting.',
+      'Add or update (or with remove=true delete) a relation between two nodes; the nodes may belong to different courses and subjects. prerequisite_of: from is needed before to; give weight (3 essential: cannot follow to without it; 2 important: gets stuck at some layer; 1 helpful background) and needed_layer (the layer of to that first needs it: use, mechanism, principle, boundary; omit if every layer needs it). part_of: from is a part of to. confused_with / contrasts_with: easily mixed up or worth contrasting. analogous_to: same structure in another subject, usable as an analogy; say in note where the analogy breaks. Prerequisite cycles are rejected.',
     inputSchema: obj(
       {
         from_id: int('From node id'),
         to_id: int('To node id'),
         relation: oneOf(RELATIONS, 'Relation'),
-        note: str('Why'),
+        note: str('Why; for prerequisites, what exactly of from is used in to'),
+        weight: int('prerequisite_of only: 1–3, default 2'),
+        needed_layer: oneOf(LAYERS, 'prerequisite_of only: first layer of to that needs from'),
         remove: { type: 'boolean', description: 'Delete the relation instead' },
       },
       ['from_id', 'to_id', 'relation'],
     ),
     run: async (env, a) => {
       inEnum(need(a, 'relation'), RELATIONS, 'relation');
+      inEnum(opt(a, 'needed_layer'), LAYERS, 'needed_layer');
+      const weight = opt<number>(a, 'weight');
+      if (weight !== null && (!Number.isInteger(weight) || weight < 1 || weight > 3)) throw new ToolError('weight must be 1–3');
+      if (a.relation !== 'prerequisite_of' && (weight !== null || opt(a, 'needed_layer')))
+        throw new ToolError('weight and needed_layer only apply to prerequisite_of');
       if (a.remove === true) {
         const r = await env.DB.prepare('DELETE FROM edges WHERE from_id = ? AND to_id = ? AND relation = ?')
           .bind(a.from_id, a.to_id, a.relation)
           .run();
         return { removed: r.meta.changes };
       }
-      await mustExist(env, 'nodes', need<number>(a, 'from_id'), 'node');
-      await mustExist(env, 'nodes', need<number>(a, 'to_id'), 'node');
+      const from = await mustExist(env, 'nodes', need<number>(a, 'from_id'), 'node');
+      const to = await mustExist(env, 'nodes', need<number>(a, 'to_id'), 'node');
+      if (a.from_id === a.to_id) throw new ToolError('a node cannot relate to itself');
+      if (a.relation === 'prerequisite_of') {
+        // Reject if to is already (transitively) a prerequisite of from
+        const cycle = await first<{ path: string }>(
+          env,
+          `WITH RECURSIVE up(id, path) AS (
+             SELECT ?, ',' || ? || ','
+             UNION ALL
+             SELECT e.from_id, up.path || e.from_id || ',' FROM up JOIN edges e ON e.to_id = up.id AND e.relation = 'prerequisite_of'
+             WHERE instr(up.path, ',' || e.from_id || ',') = 0 AND length(up.path) < 2000
+           )
+           SELECT path FROM up WHERE id = ? LIMIT 1`,
+          a.from_id,
+          a.from_id,
+          a.to_id,
+        );
+        if (cycle)
+          throw new ToolError(
+            `cycle: node ${a.to_id} is already a prerequisite of node ${a.from_id} (path ${cycle.path.split(',').filter(Boolean).reverse().join(' → ')}). Split the knowledge into finer nodes, or use contrasts_with / analogous_to.`,
+          );
+      }
       await env.DB.prepare(
-        `INSERT INTO edges (from_id, to_id, relation, note) VALUES (?, ?, ?, ?)
-         ON CONFLICT DO UPDATE SET note = COALESCE(excluded.note, edges.note)`,
+        `INSERT INTO edges (from_id, to_id, relation, note, weight, needed_layer) VALUES (?, ?, ?, ?, COALESCE(?, 2), ?)
+         ON CONFLICT DO UPDATE SET note = COALESCE(excluded.note, edges.note),
+           weight = COALESCE(?, edges.weight), needed_layer = COALESCE(excluded.needed_layer, edges.needed_layer)`,
       )
-        .bind(a.from_id, a.to_id, a.relation, opt(a, 'note'))
+        .bind(a.from_id, a.to_id, a.relation, opt(a, 'note'), weight, opt(a, 'needed_layer'), weight)
         .run();
-      return { ok: true };
+      return { ok: true, cross_course: from.course_id !== to.course_id };
+    },
+  },
+  {
+    name: 'move_node',
+    description:
+      'Move a node to another course, e.g. a basic that was filed under an applied course into the foundation course of its own subject. Evidence, states, values, decisions and links stay with the node.',
+    inputSchema: obj({ node_id: nodeId, course_id: int('Target course id') }, ['node_id', 'course_id']),
+    run: async (env, a) => {
+      const node = await mustExist(env, 'nodes', need<number>(a, 'node_id'), 'node');
+      await mustExist(env, 'courses', need<number>(a, 'course_id'), 'course');
+      if (await first(env, 'SELECT id FROM nodes WHERE course_id = ? AND title = ? AND id <> ?', a.course_id, node.title, a.node_id))
+        throw new ToolError(`course ${a.course_id} already has a node titled ${node.title}`);
+      await env.DB.prepare('UPDATE nodes SET course_id = ? WHERE id = ?').bind(a.course_id, a.node_id).run();
+      return { ok: true, from_course_id: node.course_id };
     },
   },
   {
@@ -709,8 +968,10 @@ export const TOOLS: Tool[] = [
       const exec = opt<number>(a, 'executes_decision_id');
       const closed = exec ? await completeDecision(env, exec, [a.node_id as number], opt(a, 'session_id'), opt(a, 'decision_outcome')) : null;
       const open = await plannedFor(env, [a.node_id as number]);
+      const notice = a.kind === 'exposure' || a.kind === 'prediction' ? await chainNotice(env, a.node_id as number) : null;
       return {
         evidence_id: id,
+        ...(notice ?? {}),
         ...(closed ? { closed_decision: closed } : {}),
         ...(open.length ? { open_decisions: open, hint: CLOSE_HINT } : {}),
       };
@@ -852,7 +1113,8 @@ export const TOOLS: Tool[] = [
           .run();
         replaced = r.meta.changes;
       }
-      return { decision_id: id, status: scope ? 'active' : 'planned', replaced };
+      const notice = node && a.action === 'explain' ? await chainNotice(env, node) : null;
+      return { decision_id: id, status: scope ? 'active' : 'planned', replaced, ...(notice ?? {}) };
     },
   },
   {

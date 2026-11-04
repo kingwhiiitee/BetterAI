@@ -11,6 +11,7 @@ const SERVER_INFO = { name: 'learning-knowledge', version: '0.2.0' };
 const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const INSTRUCTIONS = `个人学习知识库（Evidence-Centered Design 四层：知识节点 / 学习证据 / 知识状态 / 教学决策）。
 开课先调 overview 看上次的中断点和待办决策，再用 review_candidates 或 get_node 决定本轮任务；
+讲解新知识点前先调 prerequisite_chain 建好前置知识链（可跨课程、跨学科；link_nodes 写权重 1–3 和所需层，梳理完用 upsert_node 标 prereqs_reviewed），按 teach_order 先诊断或补缺口；
 作答后用 record_attempt 按步骤记录证据（做错只记真正出错的那一步）；
 需要时用 assess_state 写状态（必须引用证据 id），用 decide 记录下一步；结束用 end_session 写微型学习记录。
 自估把握只在学生说了或被问到时填写，不要编造。`;

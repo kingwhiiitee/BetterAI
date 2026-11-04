@@ -11,6 +11,7 @@ import {
   EVIDENCE_KIND,
   HINTS,
   KIND,
+  LAYER_LABEL,
   LEVEL,
   OUTCOME,
   QUALIFIER,
@@ -20,6 +21,7 @@ import {
   TASK_SOURCE,
   UNCERTAINTY,
   VALUE_LABEL,
+  WEIGHT,
   fmtTime,
 } from "@/lib/labels";
 import { MathText } from "@/components/math-text";
@@ -232,6 +234,15 @@ export function NodePage({ id }: { id: number }) {
                     >
                       <span className="w-20 shrink-0 text-caption-1-medium text-text-tertiary">{r.label}</span>
                       <span className="text-body-2-medium text-text-primary"><MathText>{r.title}</MathText></span>
+                      {r.relation === "prerequisite_of" && r.weight ? (
+                        <Chip variant="caption" color={r.weight === 3 ? "orange" : "neutral"}>
+                          {WEIGHT[r.weight]}
+                          {r.needed_layer ? ` · ${LAYER_LABEL[r.needed_layer]}` : ""}
+                        </Chip>
+                      ) : null}
+                      {r.course_id !== undefined && r.course_id !== node.course_id ? (
+                        <span className="shrink-0 text-caption-1-regular text-text-tertiary">{r.course}</span>
+                      ) : null}
                       {r.note ? <span className="truncate text-caption-1-regular text-text-tertiary"><MathText>{r.note}</MathText></span> : null}
                     </a>
                   </li>

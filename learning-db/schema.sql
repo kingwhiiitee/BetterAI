@@ -1,4 +1,6 @@
--- 个人学习知识树 · D1 (SQLite) 表结构 v0.2（已部署到 D1 learning-knowledge）
+-- 个人学习知识树 · D1 (SQLite) 表结构 v0.3（已部署到 D1 learning-knowledge）
+-- v0.3：前置关系带权重与所需讲解层；课程分学科、可作为跨课程共享的基础知识库；新增 analogous_to 跨学科类比关系
+--       （已有库的升级脚本见 migrations/0003-prereq-weights-cross-subject.sql）
 -- 按 Evidence-Centered Design 分四层：
 --   ① 知识节点（知识本身）  ② 学习证据（可观察表现）
 --   ③ 知识状态（基于证据的推断） ④ 教学决策（下一步做什么）
@@ -12,6 +14,9 @@ CREATE TABLE courses (
   id            INTEGER PRIMARY KEY,
   name          TEXT NOT NULL UNIQUE,
   status        TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','done')),
+  subject       TEXT,                 -- 学科，如 数学 / 统计 / 计算机 / 经济；跨学科链接按它区分
+  kind          TEXT NOT NULL DEFAULT 'course' CHECK (kind IN ('course','foundation')),
+                                      -- course：有考核目标的课程；foundation：跨课程共享的学科基础（如 线性代数基础）
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -25,6 +30,7 @@ CREATE TABLE nodes (
   intuition     TEXT,                 -- 直觉解释
   boundary      TEXT,                 -- 适用条件、反例
   pitfalls      TEXT,                 -- 普遍易错点（不是你个人的错）
+  prereqs_reviewed_at TEXT,           -- 前置知识链最近一次梳理完成的时间；NULL = 还没梳理过
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (course_id, title)
 );
@@ -54,11 +60,17 @@ CREATE TABLE node_values (
   assessed_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- 节点可以属于不同课程 / 学科：跨学科的前置、类比关系都存在这里
 CREATE TABLE edges (
   from_id       INTEGER NOT NULL REFERENCES nodes(id),
   to_id         INTEGER NOT NULL REFERENCES nodes(id),
-  relation      TEXT NOT NULL CHECK (relation IN ('prerequisite_of','part_of','confused_with','contrasts_with')),
+  relation      TEXT NOT NULL CHECK (relation IN ('prerequisite_of','part_of','confused_with','contrasts_with','analogous_to')),
+                                      -- analogous_to：不同学科里结构相同的知识，可作类比讲解（note 写清类比在哪里失效）
   note          TEXT,
+  weight        INTEGER NOT NULL DEFAULT 2 CHECK (weight BETWEEN 1 AND 3),
+                                      -- 前置权重：3 必需（不会它就学不下去）· 2 重要（缺了会在某一层卡住）· 1 辅助（背景、加深理解）
+  needed_layer  TEXT CHECK (needed_layer IN ('use','mechanism','principle','boundary')),
+                                      -- 讲到后续知识的哪一层才需要它：use 用途/用法 · mechanism 机制 · principle 原理推导 · boundary 边界；NULL = 任何层都需要
   PRIMARY KEY (from_id, to_id, relation),
   CHECK (from_id <> to_id)
 );

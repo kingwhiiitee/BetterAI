@@ -130,8 +130,20 @@ export interface TreeNode {
 export interface Edge {
   from_id: number;
   to_id: number;
-  relation: "prerequisite_of" | "part_of" | "confused_with" | "contrasts_with";
+  relation: "prerequisite_of" | "part_of" | "confused_with" | "contrasts_with" | "analogous_to";
   note: string | null;
+  weight?: number;
+  needed_layer?: "use" | "mechanism" | "principle" | "boundary" | null;
+}
+
+export interface ExternalNode {
+  id: number;
+  title: string;
+  kind: string;
+  course_id: number;
+  course: string;
+  subject: string | null;
+  level: Level;
 }
 
 export interface ValueRow {
@@ -155,6 +167,7 @@ export interface CourseTree {
   nodes: TreeNode[];
   values: ValueRow[];
   edges: Edge[];
+  external_nodes?: ExternalNode[];
   scope_decisions: ScopeDecision[];
 }
 
@@ -210,6 +223,19 @@ export interface DecisionRow {
   stale?: number | null;
 }
 
+export interface RelatedEdge {
+  relation: Edge["relation"];
+  note: string | null;
+  weight?: number;
+  needed_layer?: Edge["needed_layer"];
+  node_id: number;
+  title: string;
+  course_id?: number;
+  course?: string;
+  subject?: string | null;
+  level?: Level;
+}
+
 export interface NodeDetail {
   node: {
     id: number;
@@ -229,8 +255,8 @@ export interface NodeDetail {
   rule_baseline: { node_id: number; last_seen: string | null; suggested_level: Level } | null;
   values: (ValueRow & { id: number; assessment: string; basis: string; sources: string | null; assessed_at: string })[];
   edges: {
-    outgoing: { relation: Edge["relation"]; note: string | null; node_id: number; title: string }[];
-    incoming: { relation: Edge["relation"]; note: string | null; node_id: number; title: string }[];
+    outgoing: RelatedEdge[];
+    incoming: RelatedEdge[];
   };
   evidence: EvidenceRow[];
   decisions: DecisionRow[];

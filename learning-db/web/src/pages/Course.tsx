@@ -7,10 +7,10 @@ import { SearchField } from "@/components/base/search-field/search-field";
 import { SegmentedControl, SegmentedControlItem } from "@/components/base/segmented-control/segmented-control";
 import { Tabs, TabList, Tab, TabPanel } from "@/components/base/tabs/tabs";
 import { useApi, type CourseTree, type Level, type TreeNode, type ValueRow, type ScopeDecision } from "@/lib/api";
-import { ACTION, KIND, LEVEL, LEVELS, daysUntil } from "@/lib/labels";
+import { ACTION, KIND, LEVEL, LEVELS, WEIGHT, daysUntil } from "@/lib/labels";
 import { MathText } from "@/components/math-text";
 import { href } from "@/lib/router";
-import { Card, Empty, ErrorCard, LevelChip, Loading, PageHeader, ValuePips } from "@/components/ui";
+import { Card, CardTitle, Empty, ErrorCard, LevelChip, Loading, PageHeader, ValuePips } from "@/components/ui";
 import { cx } from "@/utils/cx";
 import { LEVEL_BAR } from "./Overview";
 
@@ -128,6 +128,7 @@ export function CoursePage({ id }: { id: number }) {
         </TabPanel>
         <TabPanel id="graph">
           <PrereqGraph nodes={nodes} edges={data.edges} ctx={ctx} />
+          <ExternalPrereqs data={data} />
         </TabPanel>
       </Tabs>
     </>
@@ -272,7 +273,8 @@ function PrereqGraph({ nodes, edges, ctx }: { nodes: TreeNode[]; edges: CourseTr
                   key={`${e.from_id}-${e.to_id}`}
                   d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`}
                   className="fill-none stroke-foreground-icon-quaternary"
-                  strokeWidth={1.5}
+                  strokeWidth={e.weight === 3 ? 2.5 : e.weight === 1 ? 1 : 1.5}
+                  strokeDasharray={e.weight === 1 ? "4 4" : undefined}
                 />
               );
             })}
@@ -288,8 +290,52 @@ function PrereqGraph({ nodes, edges, ctx }: { nodes: TreeNode[]; edges: CourseTr
         </div>
         {layout.pre.length === 0 ? (
           <p className="mt-4 text-caption-1-regular text-text-tertiary">还没有记录前置关系，AI 用 link_nodes 建立后会显示连线。</p>
-        ) : null}
+        ) : (
+          <p className="mt-4 text-caption-1-regular text-text-tertiary">粗线：必需前置；细线：重要；虚线：辅助。</p>
+        )}
       </div>
+    </Card>
+  );
+}
+
+// ---------- links into other courses ----------
+
+function ExternalPrereqs({ data }: { data: CourseTree }) {
+  const ext = new Map((data.external_nodes ?? []).map((n) => [n.id, n]));
+  const local = new Map(data.nodes.map((n) => [n.id, n]));
+  const links = data.edges
+    .filter((e) => (e.relation === "prerequisite_of" || e.relation === "analogous_to") && (ext.has(e.from_id) || ext.has(e.to_id)))
+    .map((e) => ({ e, other: ext.get(e.from_id) ?? ext.get(e.to_id)!, mine: local.get(ext.has(e.from_id) ? e.to_id : e.from_id) }));
+  if (!links.length) return null;
+  return (
+    <Card className="mt-4">
+      <CardTitle>跨课程 / 跨学科链接</CardTitle>
+      <ul className="flex flex-col gap-1">
+        {links.map(({ e, other, mine }) => (
+          <li key={`${e.from_id}-${e.to_id}-${e.relation}`} className="flex flex-wrap items-center gap-2 py-1 text-body-2-regular">
+            <a href={href.node(other.id)} className="text-body-2-medium text-text-primary hover:underline">
+              <MathText>{other.title}</MathText>
+            </a>
+            <span className="text-caption-1-regular text-text-tertiary">
+              {other.course}
+              {other.subject ? ` · ${other.subject}` : ""}
+            </span>
+            <LevelChip level={other.level} />
+            <span className="text-caption-1-regular text-text-tertiary">
+              {e.relation === "analogous_to"
+                ? "类比"
+                : ext.has(e.from_id)
+                  ? `→ ${WEIGHT[e.weight ?? 2]}前置于`
+                  : "← 以本课为前置"}
+            </span>
+            {mine ? (
+              <a href={href.node(mine.id)} className="text-body-2-medium text-text-primary hover:underline">
+                <MathText>{mine.title}</MathText>
+              </a>
+            ) : null}
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }

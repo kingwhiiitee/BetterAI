@@ -27,6 +27,16 @@ export const RELATION: Record<string, { out: string; in: string }> = {
   part_of: { out: "属于", in: "包含" },
   confused_with: { out: "容易混淆", in: "容易混淆" },
   contrasts_with: { out: "对比", in: "对比" },
+  analogous_to: { out: "跨学科类比", in: "跨学科类比" },
+};
+
+export const WEIGHT: Record<number, string> = { 3: "必需", 2: "重要", 1: "辅助" };
+
+export const LAYER_LABEL: Record<string, string> = {
+  use: "用法层",
+  mechanism: "机制层",
+  principle: "原理层",
+  boundary: "边界层",
 };
 
 export const ACTION: Record<string, { label: string; color: ChipColor }> = {

@@ -2,7 +2,7 @@
 
 给 [adaptive-learning-coach](../plugins/adaptive-learning-coach/skills/adaptive-learning-coach/SKILL.md) 用的跨会话记忆。一个 Cloudflare Worker 同时提供：
 
-- `/mcp`：给 AI 用的 MCP 接口（16 个固定工具，AI 不直接写 SQL）
+- `/mcp`：给 AI 用的 MCP 接口（18 个固定工具，AI 不直接写 SQL）
 - `/api/*`：给阅览网页用的只读 JSON
 - `/`：阅览网页（BoardUI，源码在 [web/](web)，构建产物在 `public/`）
 
@@ -14,10 +14,17 @@
 
 | 层 | 表 | 说明 |
 | --- | --- | --- |
-| 知识节点 | `courses` `nodes` `edges` `assessments` `node_values` `tasks` `task_steps` | 知识本身；考核价值按"节点 × 考核目标"估计，带依据和不确定性 |
+| 知识节点 | `courses` `nodes` `edges` `assessments` `node_values` `tasks` `task_steps` | 知识本身；考核价值按"节点 × 考核目标"估计，带依据和不确定性；前置关系带权重，可跨课程、跨学科 |
 | 学习证据 | `sessions` `attempts` `evidence` `evidence_difficulties` | 一道题拆成步骤，每步落到一个节点；做错只记真正出错的那一步 |
 | 知识状态 | `knowledge_states` | 七种状态：unknown / exposed / assisted / independent / validated / weak / recheck；只追加，必须引用证据 |
 | 教学决策 | `decisions` | 讲解、练习、复测、推进，以及可撤销的学 / 略读 / 跳过 |
+
+### 前置关系与跨学科
+
+- **权重** `edges.weight`：3 必需 · 2 重要 · 1 辅助。决定前置需要达到的水平（3 → independent，2 → assisted，1 → exposed）。
+- **所需层** `edges.needed_layer`：后续知识讲到哪一层（use / mechanism / principle / boundary）才用到这个前置；为空表示任何层都需要。
+- **跨学科**：`courses.subject` 记学科；`courses.kind = foundation` 是跨课程共享的学科基础库（如"线性代数基础"）。关系可以连接任意两门课程的节点；`analogous_to` 记不同学科间结构相同、可作类比的知识。
+- `prerequisite_chain` 沿前置关系向上（跨课程）走，给出每个前置的路径权重、所需水平、当前状态（ok / gap / unverified）和补救顺序；`nodes.prereqs_reviewed_at` 记这条链是否已梳理完。前置关系不允许成环。
 
 视图：`current_state`（每个节点的最新状态）、`rule_baseline`（只看证据的机械建议，供 AI 参考）、`current_values`、`open_decisions`。
 
@@ -25,7 +32,7 @@
 
 | 读 | 写 |
 | --- | --- |
-| `overview` `find_nodes` `get_node` `review_candidates` | `upsert_course` `upsert_assessment` `upsert_node` `link_nodes` `start_session` `end_session` `record_attempt` `record_evidence` `assess_state` `estimate_value` `decide` `update_decision` |
+| `overview` `find_nodes` `get_node` `prerequisite_chain` `review_candidates` | `upsert_course` `upsert_assessment` `upsert_node` `link_nodes` `move_node` `start_session` `end_session` `record_attempt` `record_evidence` `assess_state` `estimate_value` `decide` `update_decision` |
 
 工具层强制几条规则：状态必须引用本节点的证据；没有真实资料不能把考核价值标为 3；新的学 / 略读 / 跳过决定会自动撤销旧决定；撤销决定必须写原因；自估把握只在提供时记录。
 
@@ -39,7 +46,7 @@ npx wrangler secret put ACCESS_TOKEN    # 输入一个 16 位以上的随机字�
 npx wrangler deploy
 ```
 
-D1 数据库已经存在，`wrangler.jsonc` 里的 `database_id` 指向它。全新数据库需要先执行 `npx wrangler d1 execute learning-knowledge --remote --file schema.sql`。
+D1 数据库已经存在，`wrangler.jsonc` 里的 `database_id` 指向它。表结构升级脚本在 [migrations/](migrations)，对已有库按编号执行（`npx wrangler d1 execute learning-knowledge --remote --file migrations/<文件>`）；新列都有默认值，先迁移数据库再部署 Worker 不会影响旧版。全新数据库需要先执行 `npx wrangler d1 execute learning-knowledge --remote --file schema.sql`。
 
 没有设置 `ACCESS_TOKEN`（或少于 16 位）时，`/mcp` 和 `/api` 一律返回 401。
 
@@ -53,7 +60,7 @@ D1 数据库已经存在，`wrangler.jsonc` 里的 `database_id` 指向它。全
 打开 Worker 域名，输入 `ACCESS_TOKEN` 即可（令牌只存在本机浏览器）。页面：
 
 - **我的课程**：每门课的七种状态分布、考核目标和倒计时、下一步决策、最近学习记录
-- **课程知识树**：按状态分组看所有知识点（考核价值用三个点表示，可切换考核目标）；或切到"前置关系"看分层依赖图；可搜索
+- **课程知识树**：按状态分组看所有知识点（考核价值用三个点表示，可切换考核目标）；或切到"前置关系"看分层依赖图（线条粗细表示前置权重），以及来自其他课程、学科的前置与类比；可搜索
 - **知识点详情**：定义 / 直觉 / 适用条件 / 易错点，状态变化及理由，学习证据时间线，考核价值依据，教学决策，相关知识点
 - **待办决策**：待执行的讲解、练习、复测，以及生效中的学 / 略读 / 跳过
 
