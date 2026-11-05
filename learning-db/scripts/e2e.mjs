@@ -177,6 +177,7 @@ const mixed = await call('record_attempt', {
   context: 'right_after_teaching', hints: 'none', overall: 'wrong',
   step_results: [{ step_no: 1, outcome: 'failed', difficulties: ['execution'] }, { step_no: 2, outcome: 'demonstrated' }],
 });
+check((await call('get_node', { node_id: keepB })).rule_baseline.suggested_level === 'assisted', 'unhinted success right after teaching → assisted, not independent');
 const ebs = mixed.evidence_ids_by_step;
 const evOf = (n) => (Array.isArray(ebs) ? ebs[n - 1] : ebs[n]);
 await call('assess_state', { node_id: dupA, level: 'weak', rationale: '第一步错', basis: [evOf(1)] });

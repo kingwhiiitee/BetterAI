@@ -13,6 +13,7 @@ const INSTRUCTIONS = `个人学习知识库（Evidence-Centered Design 四层：
 讲解新知识点前先调 prerequisite_chain 建好前置知识链（可跨课程、跨学科；link_nodes 写权重 1–3 和所需层，梳理完用 upsert_node 标 prereqs_reviewed），按 teach_order 先诊断或补缺口；
 作答后用 record_attempt 按步骤记录证据（做错只记真正出错的那一步）；
 需要时用 assess_state 写状态（必须引用证据 id），用 decide 记录下一步；结束用 end_session 写微型学习记录。
+学生从零起步（没学过、必需前置多为缺口）时放慢：用自述代替诊断题，先看 2 个已解例题再做逐步撤除提示的题，本轮做到有提示能完成即可，独立检验留到下一轮；紧跟讲解后做对只算 assisted。
 自估把握只在学生说了或被问到时填写，不要编造。`;
 
 const json = (body: unknown, status = 200, extra: HeadersInit = {}) =>

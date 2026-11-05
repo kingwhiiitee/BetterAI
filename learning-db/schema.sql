@@ -239,7 +239,8 @@ SELECT n.id AS node_id,
     WHEN (SELECT COUNT(DISTINCT date(observed_at)) FROM steps
           WHERE steps.node_id = n.id AND outcome = 'demonstrated' AND hints = 'none'
             AND context IN ('delayed','mixed','unseen_variant')) >= 2 THEN 'validated'
-    WHEN EXISTS (SELECT 1 FROM steps WHERE steps.node_id = n.id AND outcome = 'demonstrated' AND hints = 'none') THEN 'independent'
+    WHEN EXISTS (SELECT 1 FROM steps WHERE steps.node_id = n.id AND outcome = 'demonstrated' AND hints = 'none'
+                   AND context <> 'right_after_teaching') THEN 'independent'
     ELSE 'assisted'
   END AS suggested_level
 FROM nodes n;

@@ -936,7 +936,7 @@ export const TOOLS: Tool[] = [
           },
           ['source', 'steps'],
         ),
-        context: oneOf(CONTEXTS, 'When/how it was answered'),
+        context: oneOf(CONTEXTS, 'When/how it was answered. right_after_teaching = straight after the explanation or worked example; rule_baseline counts an unhinted success there only as assisted'),
         hints: oneOf(HINTS, 'How much help was given'),
         overall: oneOf(OVERALL, 'Overall result'),
         confidence: int('0–100, only if the student gave it'),
