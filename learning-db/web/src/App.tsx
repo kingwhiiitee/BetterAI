@@ -39,7 +39,7 @@ export default function App() {
         <div className="min-h-dvh bg-background-full md:flex">
           <aside className="sticky top-0 z-20 flex shrink-0 flex-col border-b border-separator-border bg-background-full/85 backdrop-blur md:h-dvh md:w-56 md:border-b-0 md:border-e md:bg-background-full">
             <div className="flex h-14 items-center gap-2 px-4">
-              <a href={href.overview} className="flex items-center gap-2 text-body-semibold text-text-primary">
+              <a href={href.dashboard} className="flex items-center gap-2 text-body-semibold text-text-primary">
                 <RiBookOpenLine className="size-5 text-foreground-icon-primary" aria-hidden />
                 <span>学习知识库</span>
               </a>

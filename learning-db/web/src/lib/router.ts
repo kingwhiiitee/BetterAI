@@ -13,8 +13,8 @@ function parse(hash: string): Route {
   if (parts[0] === "course" && parts[1]) return { page: "course", id: Number(parts[1]) };
   if (parts[0] === "node" && parts[1]) return { page: "node", id: Number(parts[1]) };
   if (parts[0] === "decisions") return { page: "decisions" };
-  if (parts[0] === "dashboard") return { page: "dashboard" };
-  return { page: "overview" };
+  if (parts[0] === "courses") return { page: "overview" };
+  return { page: "dashboard" };
 }
 
 export function useRoute(): Route {
@@ -31,9 +31,9 @@ export function useRoute(): Route {
 }
 
 export const href = {
-  overview: "#/",
+  overview: "#/courses",
   course: (id: number) => `#/course/${id}`,
   node: (id: number) => `#/node/${id}`,
   decisions: "#/decisions",
-  dashboard: "#/dashboard",
+  dashboard: "#/",
 };
