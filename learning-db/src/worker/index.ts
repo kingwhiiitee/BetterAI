@@ -68,7 +68,7 @@ async function handleRpc(env: Env, msg: RpcRequest): Promise<unknown | null> {
           name: t.name,
           description: t.description,
           inputSchema: t.inputSchema,
-          annotations: { readOnlyHint: !!t.readOnly, destructiveHint: false },
+          annotations: { readOnlyHint: !!t.readOnly, destructiveHint: !!t.destructive },
         })),
       });
     case 'tools/call': {

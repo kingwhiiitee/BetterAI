@@ -2,7 +2,7 @@
 
 给 [adaptive-learning-coach](../plugins/adaptive-learning-coach/skills/adaptive-learning-coach/SKILL.md) 用的跨会话记忆。一个 Cloudflare Worker 同时提供：
 
-- `/mcp`：给 AI 用的 MCP 接口（18 个固定工具，AI 不直接写 SQL）
+- `/mcp`：给 AI 用的 MCP 接口（19 个固定工具，AI 不直接写 SQL）
 - `/api/*`：给阅览网页用的只读 JSON
 - `/`：阅览网页（BoardUI，源码在 [web/](web)，构建产物在 `public/`）
 
@@ -32,9 +32,11 @@
 
 | 读 | 写 |
 | --- | --- |
-| `overview` `find_nodes` `get_node` `prerequisite_chain` `review_candidates` | `upsert_course` `upsert_assessment` `upsert_node` `link_nodes` `move_node` `start_session` `end_session` `record_attempt` `record_evidence` `assess_state` `estimate_value` `decide` `update_decision` |
+| `overview` `find_nodes` `get_node` `prerequisite_chain` `review_candidates` | `upsert_course` `upsert_assessment` `upsert_node` `link_nodes` `move_node` `start_session` `end_session` `record_attempt` `record_evidence` `assess_state` `estimate_value` `decide` `update_decision` `delete_record` |
 
 工具层强制几条规则：状态必须引用本节点的证据；没有真实资料不能把考核价值标为 3；新的学 / 略读 / 跳过决定会自动撤销旧决定；撤销决定必须写原因；自估把握只在提供时记录。
+
+`delete_record` 用来删掉建错或重复的记录（课程、节点、考核目标、题目、学习会话、作答、证据、状态、决策、考核价值）。不带 `confirm` 调用只预览、不删除，列出会连带删掉的所有内容（例如删节点会带走它的关系、证据、状态、考核价值、决策，以及每一步都只考这个节点的题目）；学生同意后带 `confirm=true` 再调一次，所有删除在一个事务里完成。剩下的状态如果引用了被删的证据，会提示重新评估。改判断不靠删除：状态用新的 `assess_state` 覆盖，决策用 `update_decision` 撤销。
 
 ## 部署
 

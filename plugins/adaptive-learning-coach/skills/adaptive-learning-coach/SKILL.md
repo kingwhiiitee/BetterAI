@@ -274,6 +274,7 @@ description: 面向多门课程、考试导向与学习时间有限的用户，�
 - **建节点：** 新知识点用 `upsert_node`，先修、包含、易混淆、类比关系用 `link_nodes`。
 - **建知识链（讲解前必做）：** 先调 `prerequisite_chain`（`layer` 填本轮要讲到的层），它沿前置关系向上跨课程查找，给出每个前置的路径权重、所需水平、当前状态（ok / gap / unverified）和建议的补救顺序 `teach_order`。返回说这条链还没梳理过时，先补齐：用不带 `course_id` 的 `find_nodes` 在所有课程里找已有节点，找不到再建；`link_nodes` 写 `weight`（1–3）、`needed_layer` 和 note（用到它的哪一点）；确认前置都已链上（或确实没有前置）后，用 `upsert_node` 传 `prereqs_reviewed=true` 标记已梳理。`record_evidence`（讲解、检验）和 `decide`（explain）若返回 `prerequisite_chain` 提示，说明链还没建或有必需前置缺口，先处理。
 - **跨学科节点放哪里：** 属于另一个学科的基础知识（如线性代数、概率论），放进该学科的基础知识库：`upsert_course` 设 `kind=foundation` 和 `subject`（如"线性代数基础"，学科"数学"），再从应用课程的节点链过去；不要在每门应用课程里各建一份"数学基础：……"。已经建在应用课程里的基础节点可用 `move_node` 移过去，证据和状态跟着节点走。新建课程时填上 `subject`。
+- **删除记录：** 只用来清理建错或重复的记录（`delete_record`）。先不带 `confirm` 预览，把会连带删掉的内容用白话告诉学生，说明删了不能恢复，学生明确同意后再带 `confirm=true`。判断错了不要删：状态写一条新的 `assess_state`，决策用 `update_decision` 撤销；节点放错课程用 `move_node`，单条关系用 `link_nodes` 的 `remove`。
 - **公式写法：** 写进知识库的任何文字（定义、直觉、易错点、证据备注、理由等）中的公式一律用 LaTeX，并加定界符：行内 `$\sigma(z)=\frac{1}{1+e^{-z}}$`，独立成行 `$$…$$`。阅览网页只渲染带定界符的 LaTeX；不要写 `wᵀx`、`e^{w_j}`、`Σ` 这类裸露的 Unicode 或未加定界符的记号。
 - **讲解时：** 讲完一次记 `record_evidence`（kind=exposure，填 representation）；穿插的检验记 kind=prediction，填 outcome、representation，并在 interpretation 写下学生实际理解成了什么。讲新内容前看 `get_node` 的 representations_tried，遵守"同一表征连续两次失败就换"。
 - **作答后：** 用 `record_attempt`，把题目拆成步骤，每步对应一个节点（core / supporting），逐步给结果。做错只记真正出错的那一步；没做到的步骤记 not_reached；猜对记 qualifier=guessed，手误记 slip。学习困难类型可多选，只用于出错或不清楚的步骤。

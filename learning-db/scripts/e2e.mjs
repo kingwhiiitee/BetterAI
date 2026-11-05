@@ -160,3 +160,47 @@ check(found.length === 2 && found[0].course === '微积分基础', 'find_nodes f
 const { course_id: la } = await call('upsert_course', { name: '线性代数基础', subject: '数学', kind: 'foundation' });
 await call('move_node', { node_id: ids['矩阵维度'], course_id: la });
 check((await call('get_node', { node_id: ids['矩阵维度'] })).node.course === '线性代数基础', 'move_node moves a node to another course');
+
+// delete_record: preview first, cascade on confirm, history-aware hints
+const { course_id: tmp } = await call('upsert_course', { name: '临时课程', subject: '测试' });
+const { assessment_id: tmpExam } = await call('upsert_assessment', { course_id: tmp, name: '期中' });
+const dupA = (await call('upsert_node', { course_id: tmp, title: '重复节点', kind: 'concept' })).node_id;
+const keepB = (await call('upsert_node', { course_id: tmp, title: '保留节点', kind: 'concept' })).node_id;
+await call('link_nodes', { from_id: dupA, to_id: keepB, relation: 'prerequisite_of', weight: 2 });
+await call('link_nodes', { from_id: deriv, to_id: dupA, relation: 'prerequisite_of', weight: 1 });
+await call('estimate_value', { node_id: dupA, assessment_id: tmpExam, value: 2, uncertainty: 'medium', basis: '作业', sources: ['homework'] });
+const { session_id: tmpS } = await call('start_session', { course_id: tmp });
+const soloTask = await call('record_attempt', {
+  session_id: tmpS, task: { source: 'ai_generated', prompt: '只考重复节点', steps: [{ node_id: dupA }] },
+  context: 'right_after_teaching', hints: 'none', overall: 'correct', step_results: [{ step_no: 1, outcome: 'demonstrated' }],
+});
+const mixed = await call('record_attempt', {
+  session_id: tmpS, task: { source: 'ai_generated', prompt: '两个节点', steps: [{ node_id: dupA }, { node_id: keepB }] },
+  context: 'right_after_teaching', hints: 'none', overall: 'wrong',
+  step_results: [{ step_no: 1, outcome: 'failed', difficulties: ['execution'] }, { step_no: 2, outcome: 'demonstrated' }],
+});
+const ebs = mixed.evidence_ids_by_step;
+const evOf = (n) => (Array.isArray(ebs) ? ebs[n - 1] : ebs[n]);
+await call('assess_state', { node_id: dupA, level: 'weak', rationale: '第一步错', basis: [evOf(1)] });
+await call('assess_state', { node_id: keepB, level: 'independent', rationale: '第二步对', basis: [evOf(2)] });
+await call('decide', { node_id: dupA, action: 'practice', reason: '再练' });
+await call('decide', { node_id: dupA, action: 'skim', reason: '期中略读', assessment_id: tmpExam });
+
+const pv = await call('delete_record', { target: 'node', id: dupA });
+check(pv.preview && pv.will_delete.nodes === 1 && pv.will_delete.edges === 2 && pv.will_delete.tasks === 1, 'delete preview counts node, links and its solo question');
+check((await call('get_node', { node_id: dupA })).node, 'preview deletes nothing');
+const dn = await call('delete_record', { target: 'node', id: dupA, confirm: true });
+check(dn.deleted && dn.deleted_row.title === '重复节点', 'node deleted on confirm');
+check(!!(await call('get_node', { node_id: dupA })).error, 'deleted node is gone');
+const kb = await call('get_node', { node_id: keepB });
+check(kb.node && kb.edges.incoming.length === 0, 'other node keeps its record but loses the link');
+check(!(await call('get_node', { node_id: deriv })).edges.outgoing.some((e) => e.node_id === dupA), 'cross-course link removed');
+check(!!(await call('delete_record', { target: 'node', id: 999999 })).error, 'unknown id rejected');
+
+const ps = await call('delete_record', { target: 'session', id: tmpS });
+check(ps.preview && ps.states_citing_deleted_evidence?.some((k) => k.node_id === keepB), 'session preview warns about states citing its evidence');
+const pc = await call('delete_record', { target: 'course', id: tmp });
+check(pc.will_delete.courses === 1 && pc.will_delete.nodes === 1 && pc.will_delete.sessions === 1 && pc.will_delete.assessments === 1, 'course preview lists nodes, sessions, assessments');
+check((await call('delete_record', { target: 'course', id: tmp, confirm: true })).deleted, 'course deleted with everything in it');
+check(!(await call('overview', {})).courses.some((c) => c.id === tmp), 'course gone from overview');
+void soloTask;

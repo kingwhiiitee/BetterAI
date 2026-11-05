@@ -17,6 +17,7 @@ interface Tool {
   description: string;
   inputSchema: Schema;
   readOnly?: boolean;
+  destructive?: boolean;
   run: (env: Env, args: Json) => Promise<unknown>;
 }
 
@@ -125,6 +126,129 @@ const executesSchema = {
   executes_decision_id: int('Id of the planned decision this activity carried out; it is marked done'),
   decision_outcome: str('What came of carrying out that decision'),
 };
+
+// ---------- deletion ----------
+// Foreign keys have no ON DELETE actions, so deletes cascade here, in one atomic D1 batch.
+// Every id set is passed as one JSON parameter (json_each) to stay clear of the bound-parameter limit.
+
+const DELETE_TARGETS: Record<string, { table: string; label: string }> = {
+  course: { table: 'courses', label: 'name' },
+  node: { table: 'nodes', label: 'title' },
+  assessment: { table: 'assessments', label: 'name' },
+  task: { table: 'tasks', label: 'source_ref' },
+  session: { table: 'sessions', label: 'goal' },
+  attempt: { table: 'attempts', label: 'note' },
+  evidence: { table: 'evidence', label: 'note' },
+  state: { table: 'knowledge_states', label: 'level' },
+  decision: { table: 'decisions', label: 'action' },
+  value: { table: 'node_values', label: 'basis' },
+};
+
+const IN = 'IN (SELECT value FROM json_each(?))';
+
+async function ids(env: Env, sql: string, ...params: unknown[]): Promise<number[]> {
+  return (await all<{ id: number }>(env, sql, ...params)).map((r) => r.id);
+}
+
+async function deletionPlan(env: Env, target: string, id: number) {
+  const j = (xs: number[]) => JSON.stringify(xs);
+  const pick = (t: string) => (t === target ? [id] : []);
+  const C = pick('course');
+  const N = [...new Set([...pick('node'), ...(await ids(env, `SELECT id FROM nodes WHERE course_id ${IN}`, j(C)))])];
+  const As = [...pick('assessment'), ...(await ids(env, `SELECT id FROM assessments WHERE course_id ${IN}`, j(C)))];
+  const S = [...pick('session'), ...(await ids(env, `SELECT id FROM sessions WHERE course_id ${IN}`, j(C)))];
+  // A question goes with its nodes only when every one of its steps is on a deleted node
+  const T = [
+    ...new Set([
+      ...pick('task'),
+      ...(await ids(
+        env,
+        `SELECT t.id FROM tasks t WHERE EXISTS (SELECT 1 FROM task_steps s WHERE s.task_id = t.id AND s.node_id ${IN})
+           AND NOT EXISTS (SELECT 1 FROM task_steps s WHERE s.task_id = t.id AND s.node_id NOT ${IN})`,
+        j(N),
+        j(N),
+      )),
+    ]),
+  ];
+  const A = [
+    ...new Set([
+      ...pick('attempt'),
+      ...(await ids(env, `SELECT id FROM attempts WHERE task_id ${IN} OR session_id ${IN}`, j(T), j(S))),
+    ]),
+  ];
+  const steps = await ids(env, `SELECT id FROM task_steps WHERE task_id ${IN} OR node_id ${IN}`, j(T), j(N));
+  const E = [
+    ...new Set([
+      ...pick('evidence'),
+      ...(await ids(env, `SELECT id FROM evidence WHERE node_id ${IN} OR attempt_id ${IN} OR session_id ${IN}`, j(N), j(A), j(S))),
+    ]),
+  ];
+  const K = [...new Set([...pick('state'), ...(await ids(env, `SELECT id FROM knowledge_states WHERE node_id ${IN}`, j(N)))])];
+  const D = [
+    ...new Set([
+      ...pick('decision'),
+      ...(await ids(env, `SELECT id FROM decisions WHERE node_id ${IN} OR course_id ${IN} OR assessment_id ${IN}`, j(N), j(C), j(As))),
+    ]),
+  ];
+  const V = [
+    ...new Set([...pick('value'), ...(await ids(env, `SELECT id FROM node_values WHERE node_id ${IN} OR assessment_id ${IN}`, j(N), j(As)))]),
+  ];
+  const edges = (
+    await first<{ n: number }>(env, `SELECT COUNT(*) AS n FROM edges WHERE from_id ${IN} OR to_id ${IN}`, j(N), j(N))
+  )!.n;
+
+  const p = (sql: string, ...params: unknown[]) => env.DB.prepare(sql).bind(...params);
+  const statements = [
+    p(`UPDATE decisions SET superseded_by = NULL WHERE superseded_by ${IN}`, j(D)),
+    p(`UPDATE decisions SET state_id = NULL WHERE state_id ${IN}`, j(K)),
+    p(`UPDATE decisions SET done_session = NULL WHERE done_session ${IN}`, j(S)),
+    p(`DELETE FROM decisions WHERE id ${IN}`, j(D)),
+    p(`DELETE FROM evidence_difficulties WHERE evidence_id ${IN}`, j(E)),
+    p(`UPDATE evidence SET session_id = NULL WHERE session_id ${IN}`, j(S)),
+    p(`UPDATE evidence SET step_id = NULL WHERE step_id ${IN}`, j(steps)),
+    p(`DELETE FROM evidence WHERE id ${IN}`, j(E)),
+    p(`UPDATE attempts SET session_id = NULL WHERE session_id ${IN}`, j(S)),
+    p(`DELETE FROM attempts WHERE id ${IN}`, j(A)),
+    p(`DELETE FROM task_steps WHERE id ${IN}`, j(steps)),
+    p(`DELETE FROM tasks WHERE id ${IN}`, j(T)),
+    p(`DELETE FROM knowledge_states WHERE id ${IN}`, j(K)),
+    p(`DELETE FROM node_values WHERE id ${IN}`, j(V)),
+    p(`DELETE FROM edges WHERE from_id ${IN} OR to_id ${IN}`, j(N), j(N)),
+    p(`DELETE FROM nodes WHERE id ${IN}`, j(N)),
+    p(`DELETE FROM assessments WHERE id ${IN}`, j(As)),
+    p(`DELETE FROM sessions WHERE id ${IN}`, j(S)),
+    p(`DELETE FROM courses WHERE id ${IN}`, j(C)),
+  ];
+
+  // Surviving states whose cited evidence is about to go: their basis will point at nothing
+  const citing = E.length
+    ? await all(
+        env,
+        `SELECT k.id AS state_id, k.node_id, n.title, k.level FROM knowledge_states k JOIN nodes n ON n.id = k.node_id
+         WHERE k.id NOT ${IN} AND EXISTS (SELECT 1 FROM json_each(k.basis) b WHERE b.value ${IN})`,
+        j(K),
+        j(E),
+      )
+    : [];
+  const nodeTitles = N.length
+    ? await all(env, `SELECT id, title FROM nodes WHERE id ${IN} ORDER BY id LIMIT 30`, j(N))
+    : [];
+  const counts = {
+    courses: C.length,
+    nodes: N.length,
+    edges,
+    assessments: As.length,
+    node_values: V.length,
+    tasks: T.length,
+    task_steps: steps.length,
+    sessions: S.length,
+    attempts: A.length,
+    evidence: E.length,
+    knowledge_states: K.length,
+    decisions: D.length,
+  };
+  return { counts, statements, citing, nodeTitles };
+}
 
 // ---------- read operations (shared with the web API) ----------
 
@@ -726,6 +850,48 @@ export const TOOLS: Tool[] = [
         throw new ToolError(`course ${a.course_id} already has a node titled ${node.title}`);
       await env.DB.prepare('UPDATE nodes SET course_id = ? WHERE id = ?').bind(a.course_id, a.node_id).run();
       return { ok: true, from_course_id: node.course_id };
+    },
+  },
+  {
+    name: 'delete_record',
+    description:
+      'Delete a wrongly created or duplicate record, together with everything that depends on it. target: course (its nodes, assessments, sessions and all their records), node (its links, evidence, states, values, decisions, and questions whose every step is on this node), assessment (its exam values and the decisions made for it), task (the question with its steps, attempts and their evidence), session (its attempts and evidence; decisions carried out in it lose the session reference), attempt (with its step evidence), evidence, state, decision, value. Deletion cannot be undone. Call first WITHOUT confirm: nothing is deleted and you get exactly what would go. Show that to the student in plain words and set confirm=true only after the student explicitly agrees in this conversation. Do not delete to correct the learning history: a wrong judgement is superseded by a new assess_state, and a decision that no longer holds is revoked with update_decision. To file a node under another course use move_node; to drop a single relation use link_nodes with remove=true.',
+    inputSchema: obj(
+      {
+        target: oneOf(Object.keys(DELETE_TARGETS), 'What kind of record to delete'),
+        id: int('Its id'),
+        confirm: { type: 'boolean', description: 'true to actually delete (only after the student agreed to the preview); omit for a preview' },
+      },
+      ['target', 'id'],
+    ),
+    destructive: true,
+    run: async (env, a) => {
+      const target = need<string>(a, 'target');
+      inEnum(target, Object.keys(DELETE_TARGETS), 'target');
+      const { table, label } = DELETE_TARGETS[target];
+      const row = await mustExist(env, table, need<number>(a, 'id'), target);
+      const plan = await deletionPlan(env, target, a.id as number);
+      const will_delete = Object.fromEntries(Object.entries(plan.counts).filter(([, n]) => n > 0));
+      const summary = {
+        target: { kind: target, id: a.id, label: row[label] ?? null },
+        will_delete,
+        ...(plan.nodeTitles.length && target !== 'node' ? { nodes: plan.nodeTitles } : {}),
+        ...(plan.citing.length ? { states_citing_deleted_evidence: plan.citing } : {}),
+      };
+      if (a.confirm !== true)
+        return {
+          preview: true,
+          ...summary,
+          hint: 'Nothing was deleted. Tell the student what will be removed and that it cannot be undone; call again with confirm=true only after they agree.' +
+            (plan.citing.length ? ' Some remaining states cite evidence that will be deleted; reassess those nodes afterwards.' : ''),
+        };
+      await env.DB.batch(plan.statements);
+      return {
+        deleted: true,
+        ...summary,
+        deleted_row: row,
+        ...(plan.citing.length ? { hint: 'Reassess the nodes listed in states_citing_deleted_evidence with assess_state.' } : {}),
+      };
     },
   },
   {
