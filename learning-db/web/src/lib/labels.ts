@@ -114,7 +114,7 @@ export const TASK_SOURCE: Record<string, string> = {
 };
 export const ASSESSED_BY: Record<string, string> = { rule: "规则", ai: "AI", self: "自己" };
 
-/** D1 stores UTC "YYYY-MM-DD HH:MM:SS"; show it in local time. */
+// D1 stores UTC "YYYY-MM-DD HH:MM:SS" without a zone; append Z before parsing or times shift.
 export function fmtTime(s: string | null | undefined, withTime = true): string {
   if (!s) return "—";
   const d = new Date(s.includes("T") ? s : s.replace(" ", "T") + "Z");

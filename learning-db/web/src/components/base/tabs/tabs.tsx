@@ -19,23 +19,6 @@ import { cx } from "@/utils/cx";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-/**
- * Figma source: Board UI → Tab (node 3793:2942).
- *
- * Underline tabs. The tab strip sits on a 1px border/button/default baseline;
- * the active tab paints a 2px color/blue/600 underline over it.
- *   tab       px 10, py 8, gap 10 (label ↔ count), Body 1 (14/20)
- *     active     text color/blue/600, Medium weight, 2px blue underline
- *     inactive   text/primary, Regular weight, transparent underline
- *   count     radius/sm, px 4, py 1, Caption 1/Medium (12/16)
- *     active     bg color/blue/100, text color/blue/600
- *     inactive   bg black/10 @ 50% opacity, text/primary
- *   icon      optional 16px leading glyph, inherits the label color
- *
- * Built on react-aria Tabs: roving-tabindex arrow-key navigation, automatic
- * activation, and TabList/TabPanel association.
- */
-
 type IconComponent = ComponentType<{
   className?: string;
   "aria-hidden"?: boolean | "true" | "false";
@@ -84,7 +67,6 @@ export function TabList<T extends object>({ className, ref, ...props }: TabListP
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    // Labels and fonts can change width without resizing the full tab strip.
     const observeTabs = () => el.querySelectorAll("[role='tab']").forEach(tab => ro.observe(tab));
     observeTabs();
     const mo = new MutationObserver(() => { observeTabs(); measure(); });
@@ -123,9 +105,7 @@ export function TabList<T extends object>({ className, ref, ...props }: TabListP
 
 export interface TabProps extends Omit<AriaTabProps, "children"> {
   children?: ReactNode;
-  /** Optional leading icon (16px). Inherits the label color. */
   icon?: IconComponent;
-  /** Optional trailing count badge. */
   count?: ReactNode;
   ref?: Ref<HTMLDivElement>;
 }

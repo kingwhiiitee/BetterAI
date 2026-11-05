@@ -1,21 +1,10 @@
 #!/usr/bin/env node
-// precise-edit guard: a PreToolUse hook shared by Claude Code and Codex.
-//
-// Denies tool calls that would rewrite an existing, non-empty file wholesale
-// (Write over an existing file, apply_patch Add/Delete+Add, sed -i, `> file`,
-// tee, mv-over, Set-Content/Out-File, read-modify-write scripts) and tells the
-// agent to use an exact-match edit instead. It is a guardrail, not a sandbox:
-// on any internal error it exits 0 silently and the tool call proceeds.
-//
-// Usage:
-//   node guard.mjs                  read a PreToolUse payload (JSON) on stdin
-//   node guard.mjs --session-start  print the editing policy (SessionStart context)
-//
-// Config: PRECISE_EDIT_MODE=block|warn|off, or a .precise-edit.json file found by
-// walking up from the session cwd:
-//   { "mode": "block", "allowOverwrite": ["dist/**", "*.snap"],
-//     "rewriteThreshold": 0.9, "rewriteMinLines": 40 }
 
+// PreToolUse hook shared by Claude Code and Codex. Denies tool calls that would rewrite an existing,
+// non-empty file wholesale and tells the agent to use an exact-match edit instead.
+// It is a guardrail, not a sandbox: on any internal error it fails open (exit 0, no output).
+// Config: PRECISE_EDIT_MODE=block|warn|off, or .precise-edit.json found by walking up from cwd.
+//
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,9 +26,6 @@ const CASE_INSENSITIVE = process.platform === 'win32' || process.platform === 'd
 const toSlash = (p) => p.replace(/\\/g, '/');
 const normCase = (p) => (CASE_INSENSITIVE ? toSlash(p).toLowerCase() : toSlash(p));
 
-// ---------------------------------------------------------------------------
-// Config and paths
-
 export function loadConfig(cwd, env = process.env) {
   const cfg = { mode: 'block', allowOverwrite: [], rewriteThreshold: 0.9, rewriteMinLines: 40, root: path.resolve(cwd) };
   for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
@@ -52,7 +38,7 @@ export function loadConfig(cwd, env = process.env) {
         if (typeof user.rewriteThreshold === 'number') cfg.rewriteThreshold = user.rewriteThreshold;
         if (typeof user.rewriteMinLines === 'number') cfg.rewriteMinLines = user.rewriteMinLines;
       } catch {
-        // Malformed config: keep the defaults.
+        // malformed config: keep the defaults rather than break every tool call
       }
       cfg.root = dir;
       break;
@@ -64,15 +50,13 @@ export function loadConfig(cwd, env = process.env) {
   return cfg;
 }
 
-// Resolves a path as written in a command. Returns null for anything that
-// cannot be resolved statically (variables, globs, substitutions, devices).
 export function resolvePath(raw, cwd) {
   if (typeof raw !== 'string') return null;
   let p = raw.trim();
   if (!p || /[$`*?{}%]/.test(p) || p.startsWith('&') || p.startsWith('/dev/')) return null;
   if (p === '~' || p.startsWith('~/') || p.startsWith('~\\')) p = path.join(os.homedir(), p.slice(1));
   if (process.platform === 'win32') {
-    const m = /^\/([a-zA-Z])(?:\/(.*))?$/.exec(p); // Git Bash: /c/Users/... -> C:/Users/...
+    const m = /^\/([a-zA-Z])(?:\/(.*))?$/.exec(p);  // Git Bash: /c/Users/... -> C:/Users/...
     if (m) p = `${m[1]}:/${m[2] ?? ''}`;
   }
   return path.resolve(cwd, p);
@@ -87,6 +71,7 @@ function isNonEmptyFile(abs) {
   }
 }
 
+// Scratch files in temp dirs are fair game, unless the project itself lives there.
 function tempRoots(env) {
   return [os.tmpdir(), env.TMPDIR, env.TEMP, env.TMP, '/tmp', '/var/tmp', '/private/tmp', '/private/var/folders', '/var/folders']
     .filter(Boolean)
@@ -118,7 +103,6 @@ export function globToRegExp(glob) {
 }
 
 function isAllowed(abs, ctx) {
-  // Scratch files in the temp dir are fair game, unless the project itself lives there.
   if (under(abs, ctx.temp) && !under(ctx.cwd, ctx.temp)) return true;
   const rel = toSlash(path.relative(ctx.cfg.root, abs));
   const absSlash = toSlash(abs);
@@ -128,8 +112,6 @@ function isAllowed(abs, ctx) {
   });
 }
 
-// Returns the absolute path if `raw` names an existing, non-empty file that the
-// guard protects; otherwise null.
 function protectedFile(raw, ctx) {
   const abs = resolvePath(raw, ctx.cwd);
   return abs && isNonEmptyFile(abs) && !isAllowed(abs, ctx) ? abs : null;
@@ -140,11 +122,8 @@ function show(abs, ctx) {
   return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? toSlash(rel) : toSlash(abs);
 }
 
-// ---------------------------------------------------------------------------
-// POSIX shell
-
-// A small shell tokenizer: enough to find argv, redirections and heredoc
-// bodies of each simple command. It does not expand anything.
+// Just enough of a POSIX tokenizer to find argv, redirections and heredoc bodies per simple command.
+// It never expands anything; unresolvable targets are handled by the callers.
 export function parseShell(src) {
   const cmds = [];
   const newCmd = () => ({ argv: [], redirects: [], heredocs: [], hasHeredoc: false });
@@ -214,7 +193,7 @@ export function parseShell(src) {
       const e = src.indexOf('\n', i);
       i = e === -1 ? n : e;
     } else if (c === '&' && src[i + 1] === '>') {
-      pushWord(); // &> file, &>> file
+      pushWord();
       const append = src[i + 2] === '>';
       pendingRedirect = { op: append ? '>>' : '>', fd: null };
       i += append ? 3 : 2;
@@ -252,7 +231,7 @@ export function parseShell(src) {
         let m = k + 1;
         while (m < n && /[0-9-]/.test(src[m])) t += src[m++];
         if (t) {
-          i = m; // fd duplication such as 2>&1, no file involved
+          i = m;
           continue;
         }
         k++;
@@ -315,8 +294,6 @@ export function analyzeShell(src, ctx, depth = 0) {
     const args = argv.slice(1);
     const operands = args.filter((a) => !a.startsWith('-'));
 
-    // In-place editors. If no operand resolves to an existing file (globs,
-    // xargs), the targets are unknown and the call is treated as unsafe.
     const inPlace = (label) => {
       const existing = operands.map((o) => resolvePath(o, ctx.cwd)).filter((a) => a && fs.existsSync(a));
       const hits = existing.filter((a) => isNonEmptyFile(a) && !isAllowed(a, ctx));
@@ -325,6 +302,8 @@ export function analyzeShell(src, ctx, depth = 0) {
         found.push(`\`${label}\` rewrites files in place${where}`);
       }
     };
+    // In-place editors: if no operand resolves to an existing file (globs, xargs), the target is unknown
+    // and the call is treated as unsafe.
     if ((prog === 'sed' || prog === 'gsed') && args.some((a) => /^-[a-zA-Z]*i/.test(a) || a.startsWith('--in-place'))) {
       inPlace(`${prog} -i`);
     }
@@ -371,10 +350,6 @@ export function analyzeShell(src, ctx, depth = 0) {
   return found;
 }
 
-// ---------------------------------------------------------------------------
-// Inline scripts (python -c, node -e, heredocs, PowerShell here-strings)
-
-// The file argument of a write call: a string literal or a plain identifier.
 const ARG = String.raw`\s*(?:(['"\x60])([^'"\x60\n]+)\1|([A-Za-z_$][\w$]*))`;
 const WRITE_TARGETS = [
   new RegExp(String.raw`\bopen\s*\(${ARG}\s*,\s*(?:mode\s*=\s*)?['"](?:[wx]|r\+)`, 'g'),
@@ -385,9 +360,8 @@ const WRITE_TARGETS = [
 ];
 const ASSIGN_LIT = /\b([A-Za-z_$][\w$]*)\s*=\s*(?:new\s+)?(?:[\w.]*Path\s*\(\s*)?(['"`])([^'"`\n]+)\2/g;
 
-// Flags a script only when a write call targets (directly or via a simple
-// variable) an existing file, so scripts that only read, or that create new
-// output files, pass.
+// Flags an inline script only when a write call targets an existing file (directly or via a simple
+// variable), so scripts that only read or create new files pass.
 function scriptWrites(script, ctx) {
   if (!script) return [];
   const vars = new Map();
@@ -404,9 +378,6 @@ function scriptWrites(script, ctx) {
   }
   return [...hits].map((f) => `a script writes the whole of existing file ${f}`);
 }
-
-// ---------------------------------------------------------------------------
-// PowerShell
 
 function tokenizePowerShell(src) {
   const toks = [];
@@ -477,7 +448,7 @@ function tokenizePowerShell(src) {
         k++;
       }
       if (src[k] === '&') {
-        i = k + 2; // 2>&1
+        i = k + 2;
         continue;
       }
       toks.push({ t: 'redir', v: op, fd });
@@ -577,16 +548,13 @@ export function analyzePowerShell(src, ctx, depth = 0) {
     flagWrite(m[3] ?? m[4], `[IO.File]::${m[1]}`);
   }
 
-  // Classic read-replace-write on a target we could not resolve (a variable).
+  // Read-replace-write on a target we could not resolve (a variable).
   const readsAndReplaces = /\bGet-Content\b|\bReadAll(?:Text|Lines)\b/i.test(src) && /-replace\b|\.Replace\s*\(/i.test(src);
   if (unresolvedWrite && readsAndReplaces) {
     found.push('a read-replace-write pipeline (Get-Content … -replace … | Set-Content) rewrites the whole file');
   }
   return found;
 }
-
-// ---------------------------------------------------------------------------
-// Codex apply_patch
 
 export function analyzePatch(patch, ctx) {
   const found = [];
@@ -630,9 +598,6 @@ export function analyzePatch(patch, ctx) {
   }
   return found;
 }
-
-// ---------------------------------------------------------------------------
-// Entry points
 
 function commandText(input) {
   if (typeof input === 'string') return input;

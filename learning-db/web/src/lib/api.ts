@@ -1,6 +1,6 @@
-// Read-only client for the Worker's /api/* JSON.
 import { useEffect, useState } from "react";
 
+// A 401 from any call clears the stored token, which sends the app back to TokenPage.
 const TOKEN_KEY = "learning-knowledge:token";
 
 export function getToken(): string | null {
@@ -15,7 +15,7 @@ export function setToken(token: string | null) {
     if (token) localStorage.setItem(TOKEN_KEY, token);
     else localStorage.removeItem(TOKEN_KEY);
   } catch {
-    /* storage blocked: token lives for this page only */
+    // storage blocked (private mode): the token lives for this page only
   }
   window.dispatchEvent(new Event("token-change"));
 }
@@ -35,7 +35,7 @@ export async function api<T>(path: string, token = getToken()): Promise<T> {
     try {
       msg = ((await r.json()) as { error?: string }).error ?? msg;
     } catch {
-      /* not json */
+      // non-JSON error body: keep the HTTP status message
     }
     if (r.status === 401) setToken(null);
     throw new ApiError(r.status, msg);
@@ -60,8 +60,7 @@ export function useApi<T>(path: string | null) {
   return state;
 }
 
-// ---------- shapes returned by src/worker/tools.ts ----------
-
+// Response shapes below are hand-copied from src/worker/tools.ts; update both together.
 export type Level = "unknown" | "exposed" | "assisted" | "independent" | "validated" | "weak" | "recheck";
 
 export interface Assessment {
@@ -79,7 +78,6 @@ export interface Course {
   name: string;
   status: "active" | "paused" | "done";
   subject?: string | null;
-  /** "foundation" = shared subject base used across courses */
   kind?: "course" | "foundation" | null;
   created_at: string;
   node_count: number;

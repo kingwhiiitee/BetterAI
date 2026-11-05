@@ -1,5 +1,6 @@
-// End-to-end check against a running `wrangler dev` with a fresh local DB.
-//   BASE=http://127.0.0.1:8787 TOKEN=... node scripts/e2e.mjs
+// Needs `npm run dev` on a fresh local DB (npm run db:init:local) and a .dev.vars ACCESS_TOKEN:
+//   BASE=http://127.0.0.1:8787 TOKEN=... npm run e2e
+// It writes data, so never point it at the deployed Worker.
 const BASE = process.env.BASE ?? 'http://127.0.0.1:8787';
 const TOKEN = process.env.TOKEN;
 let id = 0;
@@ -102,7 +103,6 @@ const tree = await api.json();
 check(api.status === 200 && tree.nodes.length === 5 && tree.edges.length === 1, 'web API course tree');
 check((await fetch(BASE + '/api/overview')).status === 401, 'web API needs token');
 
-// decision bookkeeping
 const ex = await call('record_evidence', { node_id: ids['链式法则'], kind: 'exposure', representation: 'graph', session_id, executes_decision_id: d3.decision_id, decision_outcome: '用计算图重讲' });
 check(ex.closed_decision === d3.decision_id, 'executes_decision_id closes the decision in the same call');
 check(!!(await call('record_evidence', { node_id: ids['前向传播'], kind: 'exposure', executes_decision_id: d3.decision_id })).error, 'cannot close an already-done decision');
@@ -120,7 +120,6 @@ check(es.unclosed_decisions?.[0]?.id === d4.decision_id, 'end_session reports un
 await call('update_decision', { decision_id: d4.decision_id, status: 'done', outcome: '复测通过' });
 check(!(await call('end_session', { session_id, summary: '第二段' })).unclosed_decisions, 'nothing reported once closed');
 
-// prerequisite chain: weights, layers, cross-subject links
 const { course_id: math } = await call('upsert_course', { name: '微积分基础', subject: '数学', kind: 'foundation' });
 check((await call('overview', { course_id: math })).courses[0].kind === 'foundation', 'foundation course stored');
 const deriv = (await call('upsert_node', { course_id: math, title: '导数', kind: 'concept', prereqs_reviewed: true })).node_id;
@@ -161,7 +160,6 @@ const { course_id: la } = await call('upsert_course', { name: '线性代数基�
 await call('move_node', { node_id: ids['矩阵维度'], course_id: la });
 check((await call('get_node', { node_id: ids['矩阵维度'] })).node.course === '线性代数基础', 'move_node moves a node to another course');
 
-// delete_record: preview first, cascade on confirm, history-aware hints
 const { course_id: tmp } = await call('upsert_course', { name: '临时课程', subject: '测试' });
 const { assessment_id: tmpExam } = await call('upsert_assessment', { course_id: tmp, name: '期中' });
 const dupA = (await call('upsert_node', { course_id: tmp, title: '重复节点', kind: 'concept' })).node_id;

@@ -7,7 +7,6 @@ type CopySettings = { translate: TemplateCopyTranslator; render?: <T>(node: T) =
 const CopyContext = createContext<CopySettings | null>(null);
 const MenuContext = createContext<ReactNode>(null);
 
-/** Optional application language control shared by template account menus. */
 export function TemplateMenuProvider({ languageSelector, children }: { languageSelector?: ReactNode; children: ReactNode }) {
   return <MenuContext.Provider value={languageSelector ?? null}>{children}</MenuContext.Provider>;
 }
@@ -16,14 +15,11 @@ export function useTemplateLanguageSelector() {
   return useContext(MenuContext);
 }
 
-/** Optional application copy for templates. Without a provider, source copy is unchanged. */
 export function TemplateCopyProvider({ translate, render, children }: CopySettings & { children: ReactNode }) {
   const settings = useMemo(() => ({ translate, render }), [translate, render]);
   return <CopyContext.Provider value={settings}>{children}</CopyContext.Provider>;
 }
 
-// Only display copy is translated. IDs, form values, data keys, URLs, styles,
-// event handlers and application state retain their original values.
 const textProps = new Set([
   "children", "title", "subtitle", "description", "label", "textValue", "placeholder", "alt",
   "aria-label", "aria-description", "metricLabel", "emptyMessage", "caption", "heading", "text", "content", "renderValue",
@@ -32,7 +28,6 @@ const dataProps = new Set(["items", "options", "tabs", "columns", "series", "ran
 const dataText = new Set(["label", "title", "description", "subtitle", "header", "role", "joined"]);
 const renderProps = new Set(["children", "cell", "header", "formatter", "tickFormatter", "labelFormatter", "renderItem", "node", "link", "tick", "label", "content", "renderValue"]);
 
-/** Translate rendered copy while preserving React nodes, collection IDs and callbacks. */
 export function translateTemplateCopy<T>(value: T, translate: TemplateCopyTranslator): T {
   function visit(value: unknown, data = false): unknown {
     if (typeof value === "string") return data ? value : translate(value);
@@ -65,7 +60,6 @@ export function translateTemplateCopy<T>(value: T, translate: TemplateCopyTransl
   return visit(value) as T;
 }
 
-/** Apply to a template component's returned JSX; copy updates through React, including portals. */
 export function useTemplateCopy() {
   const settings = useContext(CopyContext);
   return useMemo(() => <T,>(node: T): T => settings?.render ? settings.render(node) : settings ? translateTemplateCopy(node, settings.translate) : node, [settings]);

@@ -1,4 +1,3 @@
-// Small app-level pieces composed from BoardUI primitives and tokens.
 import type { ReactNode } from "react";
 import { Chip } from "@/components/base/badges/chip";
 import { Skeleton } from "@/components/base/skeleton/skeleton";
@@ -44,7 +43,6 @@ export function LevelChip({ level, size = "md" }: { level: Level; size?: "sm" | 
   );
 }
 
-/** Exam value as three pips; empty value means "no data yet". */
 export function ValuePips({ value, uncertainty }: { value: number | null; uncertainty?: string }) {
   const label =
     value === null ? "暂无依据" : `考核价值：${VALUE_LABEL[value]}${uncertainty ? `（${UNCERTAINTY[uncertainty]}）` : ""}`;

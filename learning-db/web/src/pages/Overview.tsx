@@ -96,7 +96,6 @@ function CourseCard({ course: c }: { course: Course }) {
         </div>
       </div>
 
-      {/* state distribution bar */}
       <div className="flex flex-col gap-2">
         <div className="flex h-2 w-full overflow-hidden rounded-full bg-background-tertiary-default">
           {LEVELS.map((l) =>
@@ -149,7 +148,6 @@ function CourseCard({ course: c }: { course: Course }) {
   );
 }
 
-/** Solid fills per state for bars and dots, drawn from the chip palette tokens. */
 export const LEVEL_BAR: Record<string, string> = {
   unknown: "bg-text-tertiary/40",
   exposed: "bg-status-cyan-text",
@@ -160,7 +158,6 @@ export const LEVEL_BAR: Record<string, string> = {
   recheck: "bg-status-orange-text",
 };
 
-/** Courses first, then shared foundation bases (by subject). */
 export function groupCourses(courses: Course[]) {
   const groups = [
     { key: "course", label: "课程", courses: courses.filter((c) => c.kind !== "foundation") },

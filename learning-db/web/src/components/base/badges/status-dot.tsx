@@ -1,17 +1,6 @@
 import type { HTMLAttributes, Ref } from "react";
 import { cx, sortCx } from "@/utils/cx";
 
-/**
- * Figma source: Board UI → dashboard 1 status dropdown dots (node 3731:3266).
- *
- * 12×12 status indicator: a 6px solid dot centered on a tinted halo.
- * Color pairs from Figma variables:
- *   green  → halo color/green/100,  dot color/green/500
- *   yellow → halo color/yellow/200, dot color/yellow/500
- *   indigo → halo color/indigo/100, dot color/indigo/500
- * In dark mode only the halo drops to 40% opacity; the center dot stays solid.
- */
-
 type StatusDotColor = "green" | "yellow" | "indigo";
 
 export interface StatusDotProps extends HTMLAttributes<HTMLSpanElement> {

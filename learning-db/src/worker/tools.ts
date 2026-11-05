@@ -1,6 +1,3 @@
-// Fixed tool surface over the learning-knowledge D1 database.
-// The AI never writes SQL; every read and write goes through one of these.
-
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
@@ -21,8 +18,8 @@ interface Tool {
   run: (env: Env, args: Json) => Promise<unknown>;
 }
 
-// ---------- enums (must match schema.sql) ----------
-
+// These lists mirror the CHECK constraints in schema.sql. Changing one means a migration (SQLite
+// cannot alter a CHECK in place, see migrations/0003) and updating the tool descriptions below.
 const KINDS = ['concept', 'definition', 'theorem', 'formula', 'method', 'problem_type'];
 const RELATIONS = ['prerequisite_of', 'part_of', 'confused_with', 'contrasts_with', 'analogous_to'];
 const LAYERS = ['use', 'mechanism', 'principle', 'boundary'];
@@ -44,8 +41,6 @@ const LIGHT_KINDS = ['exposure', 'prediction', 'self_explain', 'self_report'];
 const ACTIONS = ['diagnose', 'explain', 'practice', 'retest', 'advance', 'learn', 'skim', 'skip'];
 const SCOPE_ACTIONS = ['learn', 'skim', 'skip'];
 
-// ---------- schema helpers ----------
-
 const int = (description: string): Schema => ({ type: 'integer', description });
 const str = (description: string): Schema => ({ type: 'string', description });
 const oneOf = (values: string[], description: string): Schema => ({ type: 'string', enum: values, description });
@@ -55,8 +50,6 @@ const obj = (properties: Json, required: string[] = []): Schema => ({
   required,
   additionalProperties: false,
 });
-
-// ---------- argument helpers ----------
 
 function need<T>(args: Json, key: string): T {
   const v = args[key];
@@ -90,9 +83,7 @@ async function mustExist(env: Env, table: string, id: number, label = table): Pr
   return row;
 }
 
-// ---------- decision bookkeeping ----------
-
-// A planned decision is stale when the node's state was re-assessed after the decision was made.
+// A planned decision is stale once the node was re-assessed after the decision was made.
 const STALE_SQL = `(d.status = 'planned' AND EXISTS (SELECT 1 FROM knowledge_states k WHERE k.node_id = d.node_id AND k.assessed_at > d.decided_at))`;
 
 async function plannedFor(env: Env, nodeIds: number[]) {
@@ -119,6 +110,7 @@ async function completeDecision(env: Env, decisionId: number, nodeIds: number[],
   return decisionId;
 }
 
+// Decisions are never closed implicitly; the hint nudges the AI to close or revoke them explicitly.
 const CLOSE_HINT =
   'These planned decisions on the same node(s) are still open. If one was just carried out, close it with update_decision (status done, with outcome); if new evidence makes it unnecessary, revoke it with a reason. Leave it only if it still applies.';
 
@@ -127,10 +119,8 @@ const executesSchema = {
   decision_outcome: str('What came of carrying out that decision'),
 };
 
-// ---------- deletion ----------
-// Foreign keys have no ON DELETE actions, so deletes cascade here, in one atomic D1 batch.
-// Every id set is passed as one JSON parameter (json_each) to stay clear of the bound-parameter limit.
-
+// FKs have no ON DELETE actions, so delete_record cascades by hand in one atomic D1 batch.
+// Id sets are bound as a single JSON parameter (json_each) to stay under D1's bound-parameter limit.
 const DELETE_TARGETS: Record<string, { table: string; label: string }> = {
   course: { table: 'courses', label: 'name' },
   node: { table: 'nodes', label: 'title' },
@@ -157,7 +147,7 @@ async function deletionPlan(env: Env, target: string, id: number) {
   const N = [...new Set([...pick('node'), ...(await ids(env, `SELECT id FROM nodes WHERE course_id ${IN}`, j(C)))])];
   const As = [...pick('assessment'), ...(await ids(env, `SELECT id FROM assessments WHERE course_id ${IN}`, j(C)))];
   const S = [...pick('session'), ...(await ids(env, `SELECT id FROM sessions WHERE course_id ${IN}`, j(C)))];
-  // A question goes with its nodes only when every one of its steps is on a deleted node
+  // A task goes with the deleted nodes only if every one of its steps is on a deleted node.
   const T = [
     ...new Set([
       ...pick('task'),
@@ -198,6 +188,7 @@ async function deletionPlan(env: Env, target: string, id: number) {
   )!.n;
 
   const p = (sql: string, ...params: unknown[]) => env.DB.prepare(sql).bind(...params);
+  // Order matters: null out references into the deleted sets before deleting rows.
   const statements = [
     p(`UPDATE decisions SET superseded_by = NULL WHERE superseded_by ${IN}`, j(D)),
     p(`UPDATE decisions SET state_id = NULL WHERE state_id ${IN}`, j(K)),
@@ -220,7 +211,8 @@ async function deletionPlan(env: Env, target: string, id: number) {
     p(`DELETE FROM courses WHERE id ${IN}`, j(C)),
   ];
 
-  // Surviving states whose cited evidence is about to go: their basis will point at nothing
+  // knowledge_states.basis is a JSON array of evidence ids with no FK; surviving states that cite
+  // deleted evidence are reported so the caller can re-assess them.
   const citing = E.length
     ? await all(
         env,
@@ -250,8 +242,7 @@ async function deletionPlan(env: Env, target: string, id: number) {
   return { counts, statements, citing, nodeTitles };
 }
 
-// ---------- read operations (shared with the web API) ----------
-
+// overview / courseTree / nodeDetail also back the web /api routes: keep their shapes in sync with web/src/lib/api.ts.
 export async function overview(env: Env, courseId: number | null) {
   const courses = await all(
     env,
@@ -313,7 +304,6 @@ export async function courseTree(env: Env, courseId: number) {
      JOIN nodes n ON n.id = v.node_id WHERE n.course_id = ?`,
     courseId,
   );
-  // Edges touching this course, including links to nodes of other courses (cross-subject prerequisites, analogies)
   const edges = await all(
     env,
     `SELECT e.* FROM edges e
@@ -373,7 +363,6 @@ export async function nodeDetail(env: Env, nodeId: number) {
     ),
     all(env, `SELECT d.*, ${STALE_SQL} AS stale FROM decisions d WHERE d.node_id = ? ORDER BY d.decided_at DESC, d.id DESC LIMIT 10`, nodeId),
     first(env, `SELECT * FROM rule_baseline WHERE node_id = ?`, nodeId),
-    // How each way of explaining has gone so far: the following prediction/step outcomes after it was used
     all(
       env,
       `SELECT x.representation, COUNT(*) AS times_used, MAX(x.observed_at) AS last_used,
@@ -397,10 +386,8 @@ export async function nodeDetail(env: Env, nodeId: number) {
   };
 }
 
-// ---------- prerequisite chain ----------
-
 const LEVEL_RANK: Record<string, number> = { unknown: 0, exposed: 1, assisted: 2, independent: 3, validated: 4 };
-// How far a prerequisite must be mastered, by the (path) weight of the link
+// Mastery a prerequisite needs, by the weakest link weight on its path to the target.
 const REQUIRED_LEVEL: Record<number, string> = { 3: 'independent', 2: 'assisted', 1: 'exposed' };
 const LAYER_SQL = `CASE e.needed_layer WHEN 'use' THEN 1 WHEN 'mechanism' THEN 2 WHEN 'principle' THEN 3 WHEN 'boundary' THEN 4 ELSE 0 END`;
 
@@ -429,8 +416,8 @@ export async function prerequisiteChain(
   const minWeight = Math.max(1, Math.min(opts.minWeight ?? 1, 3));
   const maxDepth = Math.max(1, Math.min(opts.maxDepth ?? 4, 8));
 
-  // Walk prerequisite_of edges upstream. The layer filter applies to the first hop (what this round's
-  // explanation depth needs); further up, everything a needed prerequisite rests on counts.
+  // The layer filter applies only to the first hop (what this explanation depth needs); further up,
+  // everything a needed prerequisite rests on counts. `path` guards against cycles in bad data.
   const rows = await all<{ node_id: number; child_id: number; depth: number; weight: number; path_weight: number; needed_layer: string | null; note: string | null }>(
     env,
     `WITH RECURSIVE chain(node_id, child_id, depth, weight, path_weight, needed_layer, note, path) AS (
@@ -489,8 +476,7 @@ export async function prerequisiteChain(
         status: prereqStatus(String(n.level), n.last_seen, a.path_weight),
         chain_reviewed: !!n.prereqs_reviewed_at,
         needed_for: a.needed_for,
-        // Only reported where the walk stopped at max_depth although the node has prerequisites of its own
-        truncated: a.depth >= maxDepth && Number(n.own_prereqs) > 0 ? true : undefined,
+        truncated: a.depth >= maxDepth && Number(n.own_prereqs) > 0 ? true : undefined,  // only where the walk stopped at max_depth but the chain continues
       };
     })
     // Deepest first is a valid teaching order on a DAG: a prerequisite always sits deeper than what it serves.
@@ -524,7 +510,7 @@ export async function prerequisiteChain(
   };
 }
 
-// Short notice attached to teaching writes: is the chain set up, and are essential direct prerequisites missing?
+// Attached to teaching writes so the AI is reminded to set up the chain before explaining further.
 async function chainNotice(env: Env, nodeId: number) {
   const c = await prerequisiteChain(env, nodeId, { minWeight: 2, maxDepth: 1 });
   const gaps = c.teach_order.filter((p) => c.prerequisites.find((q) => q.node_id === p.node_id)?.path_weight === 3);
@@ -539,8 +525,6 @@ async function chainNotice(env: Env, nodeId: number) {
     },
   };
 }
-
-// ---------- tools ----------
 
 const nodeId = int('Knowledge node id (look it up with find_nodes)');
 
@@ -770,7 +754,7 @@ export const TOOLS: Tool[] = [
         opt(a, 'pitfalls'),
         a.prereqs_reviewed === true ? 1 : a.prereqs_reviewed === false ? 0 : null,
       );
-      // A brand-new node marked reviewed in the same call: the INSERT branch does not run the CASE above
+      // A new node marked reviewed in the same call: the INSERT path skips the CASE above.
       if (a.prereqs_reviewed === true)
         await env.DB.prepare(`UPDATE nodes SET prereqs_reviewed_at = datetime('now') WHERE id = ?`).bind(row?.id).run();
       return { node_id: row?.id };
@@ -809,7 +793,7 @@ export const TOOLS: Tool[] = [
       const to = await mustExist(env, 'nodes', need<number>(a, 'to_id'), 'node');
       if (a.from_id === a.to_id) throw new ToolError('a node cannot relate to itself');
       if (a.relation === 'prerequisite_of') {
-        // Reject if to is already (transitively) a prerequisite of from
+        // prerequisite_of must stay a DAG: reject an edge whose target is already upstream of its source.
         const cycle = await first<{ path: string }>(
           env,
           `WITH RECURSIVE up(id, path) AS (

@@ -14,38 +14,16 @@ import { SpinnerGlyph } from "@/components/base/spinner/spinner";
 import { useTemplateCopy } from "@/components/foundations/template-copy/template-copy";
 import { cx } from "@/utils/cx";
 
-/**
- * Search field — a text field for a query: filter a list, search a table,
- * look something up.
- *
- *   <SearchField aria-label="Search teammates" placeholder="Search" value={query} onChange={setQuery} />
- *
- * Input's field (surface, hover and focus rings, invalid and disabled states,
- * two sizes) with a search icon and a small clear button that fades in once
- * there is text. It is a pill by default, like the tables' and the docs
- * sidebar's search; `shape="rounded"` matches Input in a form. `isLoading`
- * turns the icon into Spinner's orbiting light while results load.
- *
- * Built on React Aria's SearchField: Escape clears the text, Enter calls
- * `onSubmit`, and the clear button stays out of the tab order, since Escape
- * does its job from the keyboard.
- */
-
 type IconComponent = ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
 
 export interface SearchFieldProps extends Omit<AriaSearchFieldProps, "className" | "children"> {
   label?: ReactNode;
   hint?: ReactNode;
   placeholder?: string;
-  /** 36px (default) or 32px. */
   size?: InputSize;
-  /** `pill` (default) or `rounded`, Input's corners. */
   shape?: "pill" | "rounded";
-  /** Show Spinner's light in place of the icon while results load. */
   isLoading?: boolean;
-  /** Replaces the search icon. */
   icon?: IconComponent;
-  /** Accessible name of the clear button. Default "Clear search". */
   clearLabel?: string;
   className?: string;
   fieldClassName?: string;
@@ -108,7 +86,6 @@ export function SearchField({
             fieldClassName={cx(shape === "pill" && "rounded-full", fieldClassName)}
             className="[&::-webkit-search-cancel-button]:hidden"
             leadingAddon={
-              // The icon and the light share one 20px box and cross-fade.
               <span aria-hidden className="relative ms-1 size-5 shrink-0">
                 <Icon
                   className={cx(
@@ -119,7 +96,6 @@ export function SearchField({
                 <span
                   className={cx(
                     "absolute inset-0 flex items-center justify-center transition-[opacity,scale] duration-200 ease-out",
-                    // Hidden, the light stays mounted for the fade but stops turning.
                     !isLoading && "scale-75 opacity-0 [&_*]:[animation-play-state:paused]",
                   )}
                 >
@@ -134,7 +110,6 @@ export function SearchField({
                 aria-hidden={isEmpty || undefined}
                 tabIndex={-1}
                 disabled={isDisabled}
-                // Keep focus in the input while the pointer clears it.
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={clear}
                 className={cx(

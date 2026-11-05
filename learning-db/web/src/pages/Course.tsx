@@ -135,8 +135,6 @@ export function CoursePage({ id }: { id: number }) {
   );
 }
 
-// ---------- by-state board ----------
-
 function StateBoard({ nodes, ctx }: { nodes: TreeNode[]; ctx: Ctx }) {
   if (!nodes.length) return <Empty>没有匹配的知识点</Empty>;
   const groups = LEVELS.map((l) => ({ level: l, items: nodes.filter((n) => n.level === l) })).filter((g) => g.items.length);
@@ -211,8 +209,6 @@ function NodeCard({ node: n, ctx, compact }: { node: TreeNode; ctx: Ctx; compact
   );
 }
 
-// ---------- prerequisite graph ----------
-
 const COL_W = 200;
 const COL_GAP = 56;
 const ROW_H = 76;
@@ -228,7 +224,7 @@ function PrereqGraph({ nodes, edges, ctx }: { nodes: TreeNode[]; edges: CourseTr
     const visiting = new Set<number>();
     const dfs = (id: number): number => {
       if (depth.has(id)) return depth.get(id)!;
-      if (visiting.has(id)) return 0; // cycle guard
+      if (visiting.has(id)) return 0;  // cycle guard
       visiting.add(id);
       const d = Math.max(-1, ...(parents.get(id) ?? []).map(dfs)) + 1;
       visiting.delete(id);
@@ -297,8 +293,6 @@ function PrereqGraph({ nodes, edges, ctx }: { nodes: TreeNode[]; edges: CourseTr
     </Card>
   );
 }
-
-// ---------- links into other courses ----------
 
 function ExternalPrereqs({ data }: { data: CourseTree }) {
   const ext = new Map((data.external_nodes ?? []).map((n) => [n.id, n]));

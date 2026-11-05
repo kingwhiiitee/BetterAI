@@ -6,6 +6,7 @@ export type Route =
   | { page: "node"; id: number }
   | { page: "decisions" };
 
+// Hash routing, so the Worker's SPA fallback never has to know about client routes.
 function parse(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (parts[0] === "course" && parts[1]) return { page: "course", id: Number(parts[1]) };

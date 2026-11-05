@@ -1,14 +1,9 @@
 #!/usr/bin/env node
-// Installs (or removes) precise-edit for Codex and/or Claude Code at user scope.
-//
-//   node scripts/install.mjs --codex          skill, guard hook, exec rules, AGENTS.md block
-//   node scripts/install.mjs --claude-code    skill, guard hook, CLAUDE.md block (no marketplace)
-//   node scripts/install.mjs --all
-//   add --uninstall to remove, --dry-run to only print what would change
-//
-// Respects CODEX_HOME and CLAUDE_CONFIG_DIR. Every file it modifies is backed up
-// once as <file>.bak-precise-edit. Re-running is safe: entries are replaced, not duplicated.
 
+// Installs or removes precise-edit for Codex and/or Claude Code at user scope.
+// Respects CODEX_HOME and CLAUDE_CONFIG_DIR, backs up each touched file once as <file>.bak-precise-edit,
+// and is idempotent: hook entries and the marked Markdown block are replaced, never duplicated.
+//
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -90,8 +85,7 @@ function writeJson(file, before, obj) {
   writeFile(file, text);
 }
 
-// Replaces our hook group for `event` (or removes it when `command` is null),
-// leaving every other hook untouched.
+// Touches only our own hook group; other hooks in the user's settings must survive untouched.
 function setHook(settings, event, matcher, command, extra = {}) {
   settings.hooks ??= {};
   const groups = (settings.hooks[event] ?? []).filter((g) => !JSON.stringify(g).includes(GUARD_MARK));
@@ -101,7 +95,6 @@ function setHook(settings, event, matcher, command, extra = {}) {
   if (!Object.keys(settings.hooks).length) delete settings.hooks;
 }
 
-// Inserts, replaces or removes the marked policy block in a Markdown file.
 function setBlock(file, blockFile) {
   const old = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

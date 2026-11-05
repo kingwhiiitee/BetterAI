@@ -1,14 +1,13 @@
-// learning-knowledge Worker
-//   /mcp            MCP (Streamable HTTP, JSON responses) for AI clients
-//   /mcp/<token>    same, with the token in the path (for clients that cannot send headers)
-//   /api/...        read-only JSON for the web viewer
-//   everything else static assets (the web viewer)
-// All /mcp and /api requests need ACCESS_TOKEN (Authorization: Bearer <token>, or the path form above).
-
+// Routes: /mcp and /mcp/<token> = MCP over Streamable HTTP (JSON responses only, no SSE);
+// /api/* = read-only JSON for the viewer; everything else = static assets from ./public.
+// wrangler.jsonc run_worker_first must list every route handled here, or assets will shadow it.
+//
 import { TOOLS, TOOL_MAP, ToolError, overview, courseTree, nodeDetail, type Env } from './tools';
 
 const SERVER_INFO = { name: 'learning-knowledge', version: '0.2.0' };
 const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+// Sent to every MCP client on initialize; clients use it as their operating manual for the tools.
+// Keep it in sync with the tool descriptions in tools.ts and with the adaptive-learning-coach SKILL.md.
 const INSTRUCTIONS = `个人学习知识库（Evidence-Centered Design 四层：知识节点 / 学习证据 / 知识状态 / 教学决策）。
 开课先调 overview 看上次的中断点和待办决策，再用 review_candidates 或 get_node 决定本轮任务；
 讲解新知识点前先调 prerequisite_chain 建好前置知识链（可跨课程、跨学科；link_nodes 写权重 1–3 和所需层，梳理完用 upsert_node 标 prereqs_reviewed），按 teach_order 先诊断或补缺口；
@@ -31,14 +30,12 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 function authorized(req: Request, env: Env, pathToken: string | null): boolean {
-  if (!env.ACCESS_TOKEN || env.ACCESS_TOKEN.length < 16) return false; // refuse to run unprotected
+  if (!env.ACCESS_TOKEN || env.ACCESS_TOKEN.length < 16) return false;  // fail closed: a missing or short secret must never mean "open"
   const header = req.headers.get('authorization') ?? '';
   const bearer = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : null;
   const token = bearer ?? pathToken;
   return token !== null && timingSafeEqual(token, env.ACCESS_TOKEN);
 }
-
-// ---------- MCP ----------
 
 type RpcRequest = { jsonrpc: '2.0'; id?: string | number | null; method: string; params?: Record<string, unknown> };
 
@@ -107,10 +104,9 @@ async function handleMcp(req: Request, env: Env): Promise<Response> {
   return json(batch ? replies : replies[0]);
 }
 
-// ---------- web API ----------
-
+// Read-only by design: the viewer must never write. All writes go through MCP tools.
 async function handleApi(url: URL, env: Env): Promise<Response> {
-  const parts = url.pathname.split('/').filter(Boolean); // ['api', ...]
+  const parts = url.pathname.split('/').filter(Boolean);
   try {
     if (parts[1] === 'overview' && parts.length === 2) return json(await overview(env, null));
     if (parts[1] === 'courses' && parts.length === 3) return json(await courseTree(env, Number(parts[2])));

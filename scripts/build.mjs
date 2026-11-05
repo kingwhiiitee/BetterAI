@@ -1,12 +1,9 @@
 #!/usr/bin/env node
-// Builds the upload packages into dist/ (no dependencies, reproducible bytes):
-//   dist/precise-edit-skill.zip  the skill folder, for Claude.ai and ChatGPT skill uploads
-//   dist/precise-edit.plugin     the full plugin, for Claude Cowork
-//   dist/latex-fix-skill.zip     the LaTeX Fix skill, for Claude.ai and ChatGPT skill uploads
-//   dist/adaptive-learning-coach-skill.zip  the adaptive learning coach skill, for Claude.ai and ChatGPT skill uploads
-//   dist/chatgpt-latex-fix.user.js  the LaTeX Fix userscript
-//   dist/latex-fix-converter.html   the LaTeX Fix converter as one self-contained page
 
+// Builds dist/ (skill zips, the .plugin, the userscript, the self-contained converter page).
+// No dependencies and reproducible bytes: entries are sorted and timestamps fixed, so do not add
+// anything time- or machine-dependent. New skills need a pack() line here.
+//
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -40,7 +37,6 @@ function listFiles(dir, base = dir) {
     });
 }
 
-// Minimal ZIP writer (deflate, UTF-8 names, fixed timestamp 2026-01-01 00:00).
 function zip(entries) {
   const DOS_TIME = 0;
   const DOS_DATE = ((2026 - 1980) << 9) | (1 << 5) | 1;
@@ -69,7 +65,7 @@ function zip(entries) {
 
     const cd = Buffer.alloc(46);
     cd.writeUInt32LE(0x02014b50, 0);
-    cd.writeUInt16LE(0x0314, 4); // made by: UNIX, spec 2.0
+    cd.writeUInt16LE(0x0314, 4);
     cd.writeUInt16LE(20, 6);
     cd.writeUInt16LE(0x0800, 8);
     cd.writeUInt16LE(stored ? 0 : 8, 10);
@@ -111,6 +107,7 @@ const userscript = fs.readFileSync(path.join(LATEX, 'userscript', 'chatgpt-latex
 fs.writeFileSync(path.join(DIST, 'chatgpt-latex-fix.user.js'), userscript);
 console.log('dist/chatgpt-latex-fix.user.js');
 
+// Must match converter.html byte for byte; the build fails loudly otherwise.
 const TAG = '<script src="../userscript/chatgpt-latex-fix.user.js"></script>';
 const page = fs.readFileSync(path.join(LATEX, 'web', 'converter.html'), 'utf8');
 if (!page.includes(TAG) || userscript.includes('</script')) throw new Error('cannot inline the userscript into converter.html');

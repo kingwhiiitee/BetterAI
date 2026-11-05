@@ -15,26 +15,6 @@ import { cx } from "@/utils/cx";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-/**
- * Figma source: Board UI → dashboard 1 Weekly/Monthly/Yearly switch
- * (node 3731:3096).
- *
- * Single-select segmented control.
- *   track    bg background/tertiary/default, p 4, radius 10 (radius/2lg), gap 2
- *   segment  px 10, py 4, radius/md (6px)
- *     selected    bg segmented-control/selected (white in light), shadow/2xs, Body 1/Medium,
- *                 text/primary
- *     unselected  transparent, Body 1/Regular, text/secondary
- *
- * Built on react-aria ToggleButtonGroup with single selection that can't be
- * emptied — arrow keys move focus, Space/Enter selects.
- */
-
-/**
- * `solid` (default) is the Figma design — tertiary track, white thumb behind
- * the selected segment. `plain` drops the track background and the thumb; the
- * selected segment reads only through its text weight/color.
- */
 export type SegmentedControlVariant = "solid" | "plain";
 
 export interface SegmentedControlProps

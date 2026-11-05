@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { check, globToRegExp, POLICY } from '../plugins/precise-edit/scripts/guard.mjs';
 
 const GUARD = fileURLToPath(new URL('../plugins/precise-edit/scripts/guard.mjs', import.meta.url));
-const ENV = {}; // keep PRECISE_EDIT_MODE from the developer's shell out of the tests
+const ENV = {};  // keeps PRECISE_EDIT_MODE from the developer's shell out of the tests
 
 let dir;
 before(() => {

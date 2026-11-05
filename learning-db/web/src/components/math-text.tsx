@@ -1,5 +1,3 @@
-// Renders text that may contain LaTeX: $...$ / \(...\) inline, $$...$$ / \[...\] display.
-// KaTeX is bundled (no CDN), fonts ship with the build.
 import { memo, useMemo } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
@@ -7,6 +5,8 @@ import { cx } from "@/utils/cx";
 
 type Part = { math: false; text: string } | { math: true; tex: string; display: boolean };
 
+// $$...$$, \[...\], \(...\), and $...$ with guards so prices like "$5 and $10" stay text.
+// KaTeX and its fonts are bundled; the viewer must not depend on a CDN.
 const PATTERN = /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|(?<![\\$\w])\$(?!\s)((?:\\\$|[^$\n])+?)(?<!\s)\$(?!\d)/g;
 
 export function splitMath(src: string): Part[] {

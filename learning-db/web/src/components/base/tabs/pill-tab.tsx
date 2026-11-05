@@ -7,26 +7,6 @@ import { cx, sortCx } from "@/utils/cx";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-/**
- * Figma source: Board UI → "ai_chat" → Changes / Browser panel switcher
- * (node 4030:5993 region) — the fully-rounded pill tab, in two styles:
- *
- *   pill      px 8, py 5, gap 4
- *   blue      fully rounded (40px); selected bg uses the semantic blue pill
- *             surface, icon + label color/blue/500 (the AI chat panel switcher)
- *   gray      radius/2lg (10px); selected bg background/tertiary, label
- *             text/primary (quieter — scope/filter rows like the settings
- *             Tools page)
- *   idle      label text/secondary, icon foreground/icon/secondary,
- *             background/primary/hover on hover (both styles)
- *   icon      optional 20px leading glyph
- *
- * `PillTabList` owns the animated selection background so it can slide
- * between pills with a subtle spring-like settle. `PillTab` remains a plain
- * button (not a React Aria Tabs collection): these switchers drive local view
- * state, not routed tab panels.
- */
-
 type IconComponent = ComponentType<{
   className?: string;
   "aria-hidden"?: boolean | "true" | "false";

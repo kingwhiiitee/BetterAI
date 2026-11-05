@@ -1,15 +1,10 @@
--- v0.2 → v0.3：前置关系权重 + 跨学科知识点
--- 与旧版 Worker 兼容：新列都有默认值或可空，旧代码照常读写。
--- 运行：npx wrangler d1 execute learning-knowledge --remote --file migrations/0003-prereq-weights-cross-subject.sql
-
--- 课程：学科 + 是否为跨课程共享的基础知识库
+-- v0.2 → v0.3：前置关系权重 + 跨学科。先在 D1 上跑本脚本，再部署 Worker；新列都有默认值或可空，旧 Worker 照常工作。
+-- npx wrangler d1 execute learning-knowledge --remote --file migrations/0003-prereq-weights-cross-subject.sql
 ALTER TABLE courses ADD COLUMN subject TEXT;
 ALTER TABLE courses ADD COLUMN kind TEXT NOT NULL DEFAULT 'course' CHECK (kind IN ('course','foundation'));
 
--- 节点：前置知识链最近一次梳理完成的时间
 ALTER TABLE nodes ADD COLUMN prereqs_reviewed_at TEXT;
 
--- 关系：加 weight / needed_layer，relation 增加 analogous_to（CHECK 只能重建表来改）
 CREATE TABLE edges_v3 (
   from_id       INTEGER NOT NULL REFERENCES nodes(id),
   to_id         INTEGER NOT NULL REFERENCES nodes(id),

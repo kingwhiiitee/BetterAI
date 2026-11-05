@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-// Converts the math in a ChatGPT answer to one delimiter style, and recovers formulas
-// whose backslashes were stripped ("[ \frac{a}{b} ]", "( \alpha )").
-//
-//   node "Latex Fix/scripts/latex-fix.mjs" [--format dollar|bracket] [--no-recover] [file]
-//
-// Reads the file (or stdin) and writes the result to stdout. The converter is the core of
-// ../userscript/chatgpt-latex-fix.user.js, loaded here so both always behave the same.
 
 import fs from 'node:fs';
 import vm from 'node:vm';

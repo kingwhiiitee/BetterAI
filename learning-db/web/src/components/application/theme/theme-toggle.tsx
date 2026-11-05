@@ -102,7 +102,7 @@ export function applyTheme(theme: ThemeMode, { persist = true }: { persist?: boo
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
-      // The control remains usable when storage is blocked or unavailable.
+      // storage blocked: the toggle still works for this page
     }
   }
   window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: theme }));
@@ -129,11 +129,6 @@ function normalizedOrigin(
   };
 }
 
-/**
- * Reveals the next theme from the interaction point using the View Transition
- * API. Keyboard activation starts at the control's center. Unsupported
- * browsers and reduced-motion users receive the same immediate theme change.
- */
 export async function applyThemeWithTransition(
   theme: ThemeMode,
   {
@@ -173,7 +168,6 @@ export async function applyThemeWithTransition(
     await transition.ready;
     await transition.finished;
   } catch {
-    // If the browser aborts a transition mid-flight, the theme still changes.
     if (currentTheme() !== theme) applyTheme(theme);
   } finally {
     transitionStyle.remove();
@@ -206,23 +200,15 @@ export function useThemeMode(): ThemeMode {
 }
 
 export interface ThemeToggleProps {
-  /** Compact icon-only treatment for a collapsed sidebar rail. */
   collapsed?: boolean;
-  /**
-   * Visual treatment for the control. `glass-segmented` is the landing nav's
-   * skin: literal black/white rather than theme tokens, because it sits on the
-   * hero shader's near-white band in both themes and a token that follows the
-   * page would invert out of sight in dark mode.
-   */
+  // glass-segmented uses literal black/white on purpose: it sits on a near-white band in both themes.
   appearance?: "sidebar" | "segmented" | "sidebar-segmented" | "glass-segmented";
   className?: string;
-  /** Size of segmented controls; small fits inside dropdown rows. */
   size?: "small" | "medium";
-  /** Circular reveal duration in milliseconds. */
   transitionDuration?: number;
 }
 
-/** Manual light/dark control. It never reads the operating-system theme. */
+// Manual light/dark only; it never follows the OS theme.
 export function ThemeToggle({
   collapsed = false,
   appearance = "sidebar",
@@ -236,8 +222,6 @@ export function ThemeToggle({
   const switchRef = useRef<HTMLLabelElement | null>(null);
   const pointerOriginRef = useRef<ThemeTransitionOrigin | null>(null);
 
-  // Makes the component self-contained in customer projects. BoardUI itself
-  // also runs the same lookup before hydration to avoid a first-paint flash.
   useEffect(() => {
     applyTheme(storedTheme(), { persist: false });
   }, []);
@@ -261,15 +245,10 @@ export function ThemeToggle({
         aria-label="Theme"
         className={cx(
           "relative inline-flex w-fit items-center gap-1 rounded-full p-1",
-          // Mobile: 2px padding + 28px segments = 32px tall, matching the
-          // small icon buttons beside it. Desktop keeps the roomier 40px.
           glass && "p-0.5 sm:p-1",
           small && "gap-0.5 p-0.5",
           glass
-            ? // No track of its own: the host supplies the surface. A fill
-              // here would paint over it. Kept registry-safe — this component
-              // never imports the landing page's glass.
-              "z-10 bg-transparent"
+            ? "z-10 bg-transparent"
             : sidebarSurface
               ? "bg-theme-toggle-sidebar-background"
               : "bg-background-secondary-default",
@@ -288,7 +267,6 @@ export function ThemeToggle({
               : sidebarSurface
                 ? "bg-theme-toggle-sidebar-selected-background"
                 : "bg-background-primary-default",
-            // Segment width + the 4px gap: 28+4 on mobile, 32+4 above it.
             dark && (small ? "translate-x-6.5 rtl:-translate-x-6.5" : glass ? "translate-x-8 rtl:-translate-x-8 sm:translate-x-9 sm:rtl:-translate-x-9" : "translate-x-9 rtl:-translate-x-9"),
           )}
         />
@@ -321,9 +299,7 @@ export function ThemeToggle({
                 "focus-visible:ring-2 focus-visible:ring-border-focus-ring",
                 glass
                   ? selected
-                    ? // Reads against the selected pill, which is white in
-                      // light and dark grey in dark — so it flips with it.
-                      "text-black dark:text-white"
+                    ? "text-black dark:text-white"
                     : "text-black/45 hover:text-black/70 dark:text-white/45 dark:hover:text-white/70"
                   : selected
                     ? "text-foreground-icon-primary"

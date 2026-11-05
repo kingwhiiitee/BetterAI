@@ -11,22 +11,12 @@
 // @match        https://chat.openai.com/*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js#sha256=e6bfe5deebd4c7ccd272055bab63bd3ab2c73b907b6e6a22d352740a81381fd4
 // @grant        none
-// @run-at       document-idle
 // ==/UserScript==
 
-// What it fixes on chatgpt.com:
-//   1. Formulas shown as raw text (\[ … \], \( … \), $$ … $$, or the backslash-stripped
-//      "[ \frac{a}{b} ]" / "( \alpha )" forms) are rendered with KaTeX.
-//   2. The message "Copy" button copies math as $…$ / $$…$$ instead of \( \) / \[ \],
-//      so it pastes correctly into Obsidian, Typora, Notion, Jupyter, GitHub and VS Code.
-//   3. Selecting and copying rendered formulas copies their LaTeX source instead of
-//      garbled duplicated text ("E=mc2E = mc^2E=mc2").
-//   4. Alt+click a formula copies its LaTeX source.
-// Copy format: run  localStorage.setItem('betterai-latex-fix.format', 'bracket')  in the
-// console to keep \( \) / \[ \] instead (default 'dollar').
-// The core below has no DOM dependencies; scripts/latex-fix.mjs, web/converter.html and the
-// tests load it.
-
+// The LatexFix core below is DOM-free and must stay that way: scripts/latex-fix.mjs and the tests run it
+// in a node:vm sandbox, and web/converter.html loads it with BETTERAI_LATEX_CORE_ONLY. scripts/build.mjs
+// inlines this whole file into the converter page, so it must never contain a closing script tag.
+//
 (function () {
   'use strict';
 
@@ -34,12 +24,11 @@
     const TEX_COMMAND = /\\[A-Za-z]+/;
     const TEX_SIGNAL = /\\[A-Za-z]+|[\^_]/;
     const FENCE = /[ \t]*(`{3,}|~{3,})[^\n]*/y;
-    // Backslash-stripped display math, the most common ChatGPT breakage:
-    // "[ E = mc^2 ]" on one line, or "[" … "]" on lines of their own.
+    // Backslash-stripped display math, ChatGPT's most common breakage: "[ E = mc^2 ]".
     const BARE_LINE = /([ \t]*)\[[ \t]+([^\n]*?\S)[ \t]+\][ \t]*(?=\n|$)/y;
     const BARE_BLOCK = /([ \t]*)\[[ \t]*\n((?:[^\n]*\S[^\n]*\n)+?)[ \t]*\][ \t]*(?=\n|$)/y;
 
-    // End of the paragraph that contains index i: math never spans a blank line.
+    // Math never spans a blank line; this bounds every delimiter search.
     function paragraphEnd(s, i) {
       const m = /\n[ \t]*\n/g;
       m.lastIndex = i;
@@ -47,7 +36,6 @@
       return r ? r.index : s.length;
     }
 
-    // Index of `close` at or after `from`, skipping backslash escapes such as \\ and \$.
     function findClose(s, from, close, limit) {
       for (let i = from; i < limit; i++) {
         if (s.startsWith(close, i)) return i + close.length <= limit ? i : -1;
@@ -56,7 +44,6 @@
       return -1;
     }
 
-    // Index of the ")" that closes the "(" at i on the same line, or -1.
     function matchParen(s, i) {
       let depth = 0;
       for (let j = i; j < s.length; j++) {
@@ -69,9 +56,8 @@
       return -1;
     }
 
-    // Splits text into text / code / math tokens.
-    //   markdown: also recognise fenced and inline code (left untouched)
-    //   recover:  also recognise backslash-stripped "[ … ]" and "( \cmd … )" math
+    // markdown: leave fenced and inline code untouched. recover: also accept the backslash-stripped
+    // "[ ... ]" and "( \cmd ... )" forms.
     function tokenize(src, { markdown = true, recover = true } = {}) {
       const out = [];
       let text = '';
@@ -80,7 +66,7 @@
         text = '';
         out.push(tok);
       };
-      // Display math alone on its line(s) is a "block": it keeps its indentation (lists).
+      // Display math alone on its line(s) keeps its indentation, so it stays inside list items.
       const pushMath = (start, end, tex, display) => {
         const lineStart = src.lastIndexOf('\n', start - 1) + 1;
         const indent = src.slice(lineStart, start);
@@ -192,11 +178,7 @@
       return [tok.indent + d0, ...body, tok.indent + dc].join('\n');
     }
 
-    // Rewrites every formula in Markdown to one delimiter style:
-    //   dollar  (default) $…$ and $$…$$  for Obsidian, Typora, Notion, Jupyter, GitHub, VS Code
-    //   bracket \(…\) and \[…\]          for LaTeX documents and MathJax sites
-    // Code blocks and inline code are never touched. With the dollar format, prices such as
-    // "$5" are escaped to "\$5" so that "$5 and $10" does not turn into a formula.
+    // With the dollar format, prices like "$5" are escaped to "\$5" so "$5 and $10" does not become a formula.
     function convert(md, { format = 'dollar', recover = true } = {}) {
       const money = format !== 'bracket';
       return tokenize(String(md), { recover })
@@ -210,14 +192,10 @@
     return { tokenize, convert, formatMath };
   })();
 
-  // Node (scripts/latex-fix.mjs, tests) and the converter page only need the core.
   if (typeof document === 'undefined' || globalThis.BETTERAI_LATEX_CORE_ONLY) {
     globalThis.LatexFix = LatexFix;
     return;
   }
-
-  // ---------------------------------------------------------------------------
-  // Browser part (chatgpt.com)
 
   const katex = window.katex;
   const MESSAGE = '[data-message-author-role="assistant"]';
@@ -232,11 +210,10 @@
     }
   };
 
-  // 1. Render leftover raw math. React owns the text nodes, so they are never removed:
-  // the original node is emptied and the rendered copy is inserted after it. If React
-  // later writes new text into the node, the old copy is dropped and the node re-rendered.
-  const renderedFor = new WeakMap(); // text node -> rendered span
-  const sourceOf = new WeakMap(); // rendered span -> text node
+  // React owns the text nodes, so they are never removed: the original is emptied and the rendered copy
+  // is inserted after it. If React later writes into the node, the copy is dropped and re-rendered.
+  const renderedFor = new WeakMap();
+  const sourceOf = new WeakMap();
 
   function renderTextNode(node) {
     const prev = renderedFor.get(node);
@@ -299,8 +276,7 @@
     schedule();
   }
 
-  // 2. Message "Copy" button: convert delimiters in what it writes to the clipboard.
-  // Code-block copy buttons sit inside .markdown / pre and are left alone.
+  // Only the message Copy button is patched; code-block copy buttons (inside .markdown / pre) are left alone.
   let lastTarget = null;
   document.addEventListener('pointerdown', (e) => (lastTarget = e.target), true);
   document.addEventListener('keydown', (e) => (lastTarget = e.target), true);
@@ -336,7 +312,6 @@
     }
   }
 
-  // 3. Selecting and copying rendered math: copy the LaTeX source.
   const texOf = (el) => {
     const a = el.querySelector('annotation[encoding="application/x-tex"]');
     return a ? a.textContent : null;
@@ -351,7 +326,7 @@
     if (!box.querySelector('.katex')) return;
     let changed = false;
     for (const el of box.querySelectorAll('.katex-display, .katex')) {
-      if (!box.contains(el)) continue; // inside a .katex-display that was already replaced
+      if (!box.contains(el)) continue;  // inside a .katex-display that was already replaced
       const tex = texOf(el);
       if (tex == null) continue;
       const display = el.classList.contains('katex-display') || !!el.closest('.katex-display');
@@ -368,7 +343,6 @@
     e.preventDefault();
   });
 
-  // 4. Alt+click a formula to copy its LaTeX source.
   document.addEventListener(
     'click',
     (e) => {

@@ -13,28 +13,6 @@ import type { DisclosureGroupProps as AriaDisclosureGroupProps, DisclosureProps 
 import { RiAddLine, RiArrowDownSLine } from "@remixicon/react";
 import { cx, sortCx } from "@/utils/cx";
 
-/**
- * Accordion — stacked sections that expand in place: FAQs, settings groups,
- * order details. Built on React Aria's DisclosureGroup and Disclosure, so
- * each header is a real button with aria-expanded, and a collapsed panel is
- * `hidden="until-found"`: find-in-page still reaches its text and opens it.
- *
- *   <Accordion defaultExpandedKeys={["billing"]}>
- *     <AccordionItem id="billing" title="How does billing work?">…</AccordionItem>
- *     <AccordionItem id="seats" title="Can I add seats later?">…</AccordionItem>
- *   </Accordion>
- *
- * Variants: `divided` (hairlines between rows), `contained` (the landing
- * FAQ's tray of cards), and `separated` (one bordered card per item).
- *
- * Motion follows the agent limits card and Tree View: the panel's height
- * eases open over 300ms on cubic-bezier(0.22, 1, 0.36, 1) while its content
- * fades in, drops 4px into place and sharpens from a 4px blur; the indicator
- * turns with it (a chevron flips, a plus turns into a close). React Aria
- * measures the panel and exposes `--disclosure-panel-height`, so this is
- * all CSS. Reduced motion switches every transition off.
- */
-
 type IconComponent = ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
 
 export type AccordionVariant = "divided" | "contained" | "separated";
@@ -44,16 +22,12 @@ const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
 const styles = sortCx({
   group: {
     divided: "flex flex-col divide-y divide-separator-border",
-    // The landing FAQ: cards on a tray, inverted in dark mode so the cards
-    // stay a step lighter than the page.
     contained: "flex flex-col gap-[3px] rounded-[26px] bg-background-secondary-default p-[3px] dark:bg-background-primary-default",
     separated: "flex flex-col gap-2",
   },
   item: {
     divided: "",
     contained: "rounded-[23px] bg-background-primary-default dark:bg-background-secondary-default",
-    // Modal's ground rather than the card surface: in dark mode the inputs
-    // and switch tracks a settings group holds keep an edge against it.
     separated: "rounded-2xl border border-border-button-default bg-background-full shadow-xs",
   },
   trigger: {
@@ -77,7 +51,6 @@ const AccordionContext = createContext<AccordionContextValue>({ variant: "divide
 
 export interface AccordionProps extends Omit<AriaDisclosureGroupProps, "className" | "children"> {
   variant?: AccordionVariant;
-  /** `chevron` flips to point up; `plus` turns into a close. Default `chevron`. */
   indicator?: "chevron" | "plus";
   className?: string;
   children: ReactNode;
@@ -95,11 +68,8 @@ export function Accordion({ variant = "divided", indicator = "chevron", classNam
 
 export interface AccordionItemProps extends Omit<AriaDisclosureProps, "className" | "children"> {
   title: ReactNode;
-  /** Supporting line under the title, e.g. a summary of the settings inside. */
   description?: ReactNode;
-  /** Remix Icon before the title. */
   icon?: IconComponent;
-  /** Heading level of the title. Default 3. */
   headingLevel?: 2 | 3 | 4 | 5 | 6;
   className?: string;
   children: ReactNode;

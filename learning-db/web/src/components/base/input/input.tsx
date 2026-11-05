@@ -23,32 +23,6 @@ import { Label } from "./label";
 import { HintText, hintTextClassName } from "./hint-text";
 import { cx, sortCx } from "@/utils/cx";
 
-/**
- * Figma source: Board UI → Input (node 3665:1849).
- *
- * Architecture (mirrors the Untitled UI / React Aria pattern):
- *
- *   InputBase   — the styled field shell. Renders <AriaGroup> + adornments
- *                 + <AriaInput>. State (hover / focus / disabled / invalid)
- *                 arrives as render-prop booleans from Aria.
- *   TextField   — wraps <AriaTextField> and a TextFieldContext so size /
- *                 classes can flow from the composer down into InputBase
- *                 without prop drilling.
- *   Input       — opinionated composition: TextField → Label → InputBase
- *                 → HintText, or React Aria's FieldError for `errorMessage`
- *                 while the field is invalid. The component most consumers use.
- *
- * Why React Aria:
- *   - Label ↔ input ↔ hint association via aria-labelledby / aria-describedby
- *   - aria-required, aria-invalid auto-applied
- *   - Form library / native validation integration
- *   - i18n, RTL, autofill edge cases handled
- *   - Render-prop state surfaces `isFocusWithin`, `isHovered`, `isDisabled`,
- *     `isInvalid`, `isRequired` — no CSS pseudo gymnastics
- *
- * Visuals stay 1:1 with Figma — see `styles/theme.css` for the tokens.
- */
-
 export type InputSize = "medium" | "small";
 
 type IconComponent = ComponentType<{
@@ -56,25 +30,13 @@ type IconComponent = ComponentType<{
   "aria-hidden"?: boolean | "true" | "false";
 }>;
 
-/* -------------------------------------------------------------------------- */
-/*  TextFieldContext                                                           */
-/* -------------------------------------------------------------------------- */
-
 export interface TextFieldContextValue {
   size?: InputSize;
   fieldClassName?: string;
   inputClassName?: string;
 }
 
-/**
- * Shared by every field that wants Input's shell — `Textarea` reads the same
- * size and class overrides out of it, so a composed form stays consistent.
- */
 export const TextFieldContext = createContext<TextFieldContextValue>({});
-
-/* -------------------------------------------------------------------------- */
-/*  TextField                                                                  */
-/* -------------------------------------------------------------------------- */
 
 export interface TextFieldProps
   extends Omit<AriaTextFieldProps, "className">,
@@ -101,7 +63,7 @@ export function TextField({
           className,
         )}
       >
-        {children as never /* RAC accepts render-prop children */}
+        {children as never }
       </AriaTextField>
     </TextFieldContext.Provider>
   );
@@ -109,25 +71,15 @@ export function TextField({
 
 TextField.displayName = "TextField";
 
-/* -------------------------------------------------------------------------- */
-/*  InputBase                                                                  */
-/* -------------------------------------------------------------------------- */
-
 export interface InputBaseProps extends Omit<AriaInputProps, "size" | "className"> {
   size?: InputSize;
   className?: string;
   leadingIcon?: IconComponent;
   trailingIcon?: IconComponent;
-  /** Custom element rendered in the leading slot (Phone basic uses this). */
   leadingAddon?: ReactNode;
-  /** Custom element rendered in the trailing slot, in place of
-   *  `trailingIcon` (ComboBox's toggle button uses this). */
   trailingAddon?: ReactNode;
-  /** Class for the field shell. */
   fieldClassName?: string;
-  /** Ref to the <input> element. */
   ref?: Ref<HTMLInputElement>;
-  /** Ref to the field shell wrapper. */
   groupRef?: Ref<HTMLDivElement>;
 }
 
@@ -141,13 +93,12 @@ const inputStyles = sortCx({
   ].join(" "),
 
   fieldSize: {
-    medium: "p-2",                // 8px all sides → h auto = 36
-    small:  "h-8 px-1.5 py-2",    // 32 / 6 / 8
+    medium: "p-2",
+    small:  "h-8 px-1.5 py-2",
   },
 
-  // When a leadingAddon is present (Phone basic): tighten left padding.
   fieldWithAddonSize: {
-    medium: "h-9 ps-1 pe-2 py-2", // 36 / 4 / 8 / 8
+    medium: "h-9 ps-1 pe-2 py-2",
     small:  "h-8 ps-1 pe-1.5 py-2",
   },
 
@@ -167,7 +118,6 @@ const inputStyles = sortCx({
   icon: "size-5 shrink-0",
 });
 
-/** The field shell's state for a render-prop className. */
 export interface InputFieldState {
   isFocusWithin: boolean;
   isHovered: boolean;
@@ -175,10 +125,6 @@ export interface InputFieldState {
   isInvalid: boolean;
 }
 
-/**
- * The field shell's classes for a state. InputBase uses it, and so do fields
- * whose editable part isn't an <input> (Time Field's segments).
- */
 export function inputFieldClassName(
   { isFocusWithin, isHovered, isDisabled, isInvalid }: InputFieldState,
   size: InputSize = "medium",
@@ -187,13 +133,9 @@ export function inputFieldClassName(
   return cx(
     inputStyles.field,
     hasAddon ? inputStyles.fieldWithAddonSize[size] : inputStyles.fieldSize[size],
-    // Hover: idle, no focus, no disabled, no invalid
     isHovered && !isFocusWithin && !isDisabled && !isInvalid && "ring-border-button-hover",
-    // Focus wins over hover
     isFocusWithin && !isDisabled && !isInvalid && "ring-border-button-active",
-    // Disabled
     isDisabled && "bg-input-disabled-background text-input-disabled-foreground",
-    // Invalid
     isInvalid && "bg-background-tertiary-error text-foreground-icon-error",
   );
 }
@@ -230,7 +172,6 @@ export function InputBase({
           <AriaInput
             ref={ref}
             {...inputProps}
-            // Align to the field's start even when email/URL values use LTR.
             className={cx(inputStyles.input, direction === "rtl" ? "pr-1 text-right" : "pl-1 text-left", ctx.inputClassName, className)}
           />
         </div>
@@ -243,10 +184,6 @@ export function InputBase({
 }
 
 InputBase.displayName = "InputBase";
-
-/* -------------------------------------------------------------------------- */
-/*  Input (composed)                                                           */
-/* -------------------------------------------------------------------------- */
 
 export interface InputProps
   extends Omit<TextFieldProps, "children">,
@@ -261,18 +198,9 @@ export interface InputProps
     > {
   label?: ReactNode;
   hint?: ReactNode;
-  /**
-   * Shown in place of `hint` while the field is invalid, through React Aria's
-   * FieldError: the error-message slot the input is described by. Pass a
-   * function to render from the validation result, e.g. the browser's own
-   * message under the default native validation.
-   */
   errorMessage?: AriaFieldErrorProps["children"];
-  /** Show an info icon next to the label. Replace with tooltip when Tooltip lands. */
   tooltip?: boolean | string;
   placeholder?: string;
-  /** Direction of the editable value, independent of the label and adornments.
-   * Email, URL and telephone inputs default to LTR inside RTL forms. */
   inputDir?: "ltr" | "rtl" | "auto";
 }
 
@@ -296,8 +224,6 @@ export function Input({
     <TextField
       {...textFieldProps}
       className={className}
-      // Don't clobber an explicit aria-label; fall back to the placeholder
-      // only for unlabelled fields that don't provide one.
       aria-label={
         textFieldProps["aria-label"] ??
         (!label && typeof placeholder === "string" ? placeholder : undefined)

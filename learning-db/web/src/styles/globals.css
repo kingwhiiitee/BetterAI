@@ -2,28 +2,11 @@
 @import "./theme.css";
 @import "./typography.css";
 
-/* ---------------------------------------------------------------------------
- * Dark mode strategy
- *
- * We use a class-based dark variant. Toggle dark mode by adding the `.dark`
- * class to <html> (a theme provider like `next-themes` can do this later).
- *
- *   <html class="dark">  →  every `dark:*` utility activates
- *
- * Components should NOT use `dark:` prefixes directly. Instead they reference
- * semantic color tokens (e.g. `bg-bg-primary`, `text-text-primary`) that flip
- * under `.dark` in styles/theme.css.
- * --------------------------------------------------------------------------- */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Resolve the nearest direction boundary, including nested LTR regions.
- * Tailwind's ancestor-based defaults also match inside an opposing region. */
 @custom-variant rtl (&:dir(rtl));
 @custom-variant ltr (&:dir(ltr));
 
-/* The next theme is revealed by ThemeToggle from the exact interaction point.
- * Native view-transition crossfades are disabled so only the soft circular
- * clip-path animation runs; unsupported browsers simply ignore these rules. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
@@ -74,16 +57,11 @@
   z-index: 2;
 }
 
-/* Components often have their own hover/focus color transitions. Freeze them
- * while the browser captures the next theme so the expanding circle contains
- * the fully resolved new palette instead of a frame that is still fading from
- * the old one. This is what makes the click-origin reveal read clearly. */
 .theme-transitioning,
 .theme-transitioning * {
   transition: none !important;
 }
 
-/* Reset + base */
 html,
 body {
   -webkit-font-smoothing: antialiased;
@@ -104,9 +82,6 @@ body {
   color: var(--color-text-primary);
 }
 
-/* Theme-aware monochrome BoardUI mark. Both images keep their intrinsic
- * dimensions while the root theme class decides which one participates in
- * layout, avoiding a light-logo flash during hydration. */
 .theme-logo-dark,
 .theme-asset-dark {
   display: none;
@@ -120,21 +95,6 @@ body {
   display: block;
 }
 
-/* Tailwind expands shadow utilities into `--tw-shadow` at build time. Point
- * those generated utilities back to the live dark elevation tokens so the
- * class-based theme can adjust opacity without component-level overrides.
- *
- * Each override is part of its utility (`@utility`), so Tailwind emits it in
- * the utilities layer right after the base utilities and before every variant:
- * a later variant such as `disabled:shadow-none` wins in dark as it does in
- * light. (Written as plain rules outside the layers, they outranked every
- * variant, and a disabled button kept its shadow in dark.) The `:where()`
- * keeps the utility's own specificity and matches only an element that has
- * the base class inside `.dark`, so a variant on its own (`hover:shadow-xs`)
- * keeps its value as before. One change in dark: a shadow variant on an
- * element that also has a base shadow class (`shadow-sm hover:shadow-md`) now
- * takes effect, with its light value, where the base class's dark value used
- * to win in every state. */
 @utility shadow-2xs {
   &:where(.dark .shadow-2xs) {
     --tw-shadow: var(--shadow-2xs);
@@ -186,12 +146,10 @@ body {
   }
 }
 
-/* Hide default expand arrow on Safari */
 details summary::-webkit-details-marker {
   display: none;
 }
 
-/* Hide default number-input spinners */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -201,15 +159,10 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* Hide default search clear button */
 input[type="search"]::-webkit-search-cancel-button {
   -webkit-appearance: none;
 }
 
-/* iOS Safari auto-zooms the page when a focused form field's font-size is
- * under 16px — our text-body-regular/medium tokens are 14px by design, so
- * bump just the font-size (not the whole token) on small screens instead of
- * changing the design system's type scale. */
 @media (max-width: 639px) {
   input,
   select,
@@ -218,7 +171,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* Soft fade applied to an animated number each time its target changes */
 @keyframes number-fade {
   from {
     opacity: 0.35;
@@ -231,15 +183,7 @@ input[type="search"]::-webkit-search-cancel-button {
   animation: number-fade 220ms ease-out;
 }
 
-/* Recharts' accessibility layer makes the chart surface and its shapes
- * (bars, sectors, dots) keyboard-focusable, and Chrome paints the UA focus
- * outline around whichever one you click - a blue box around a ring segment
- * or a bar. Every chart card drives its own focus feedback (hover darkening,
- * headline swap), so the outline is noise: hide it across every Recharts
- * chart. Keyboard users still get the cards' own active states. */
 .recharts-wrapper {
-  /* SVG axes use physical coordinates. Keep their data and numeric labels in
-   * order while card headers, legends and surrounding controls follow RTL. */
   direction: ltr;
 }
 
@@ -250,27 +194,11 @@ input[type="search"]::-webkit-search-cancel-button {
   outline: none;
 }
 
-/* Liquid glass (landing nav + hero) — the rim light.
- *
- * A fixed conic gradient standing in for a bevel lit from a single direction:
- * bright along the top edge where the light source is, dark down both sides
- * where the glass turns away, and a weaker bounce along the bottom. It does
- * not rotate — a travelling highlight reads as an animation playing on the
- * control, where a real edge just sits there catching the room.
- *
- * Achromatic on purpose: highlights are white, shading is black, nothing in
- * between carries a hue.
- *
- * The two-layer mask (padding-box XOR full box) keeps only the 1.5px ring,
- * letting the gradient paint the stroke without covering the glass. */
-
 .landing-glass-stroke {
   pointer-events: none;
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  /* Every value here is set inline by `LiquidGlassSurface` from the shared
-   * glass config; the fallbacks are only for a bare use of the class. */
   padding: var(--lg-rim-width, 1.5px);
   background: conic-gradient(
     from var(--lg-rim-angle, 0deg),
@@ -282,10 +210,6 @@ input[type="search"]::-webkit-search-cancel-button {
     var(--lg-rim-sh, rgb(0 0 0 / 0.14)) 290deg,
     var(--lg-rim-hi, rgb(255 255 255 / 0.9)) 360deg
   );
-  /* Shorthands first, composites last: `-webkit-mask` aliases `mask` in
-   * Chromium, so a shorthand placed after a composite silently resets it to
-   * `add` — and an un-composited mask paints the full conic wash over the
-   * button instead of a ring. */
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -298,12 +222,6 @@ input[type="search"]::-webkit-search-cancel-button {
   transition: opacity var(--lg-ms, 200ms) ease;
 }
 
-/* Liquid glass hover.
- *
- * Resting and hover values arrive together as inline custom properties, and
- * the swap happens here in CSS rather than in React state — hover then costs
- * a style recalculation instead of a re-render of everything inside the glass.
- * `.lg-hover` is the opt-in: a surface without it keeps its resting value. */
 .lg-tint {
   background-color: var(--lg-tint, transparent);
   transition: background-color var(--lg-ms, 200ms) ease;
@@ -351,18 +269,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* Split-flap ("Solari" board) digit, used by the image-generation countdown.
- * Two leaves hinged on the card's centre seam:
- *   flap-fall  the outgoing digit's TOP half swings down over the incoming
- *              bottom half. Eased IN, because a real flap is falling under
- *              gravity — it accelerates — and it darkens as it tips away
- *              from the light.
- *   flap-rise  the incoming digit's BOTTOM half swings up from edge-on,
- *              starting exactly when the fall lands (delay = fall duration,
- *              `both` so it waits at 90deg instead of flashing flat). The
- *              small overshoot past 0deg is the slap against the stop —
- *              that bounce is what makes it read mechanical rather than
- *              like a plain rotation. */
 @keyframes flap-fall {
   from {
     transform: rotateX(0deg);
@@ -408,18 +314,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* New-row entrance for the Storage settings table. Three coordinated
- * pieces (wrapper pairs with `grid grid-rows-[1fr]` + an overflow-hidden
- * middle layer, content carries the slide):
- *   row-grow-in   wrapper's grid track 0fr → 1fr — pushes the rows below
- *                 down smoothly.
- *   row-slide-in  content translates -100% → 0 with the SAME duration and
- *                 easing, so it stays glued to the growing wrapper's bottom
- *                 edge — visually the row slides out from underneath the
- *                 header row above it.
- *   row-fade-in   opacity/blur on a SHORTER clock than the movement — the
- *                 row is fully visible before it finishes settling (fades
- *                 must complete before movement ends). */
 @keyframes row-grow-in {
   from {
     grid-template-rows: 0fr;
@@ -448,9 +342,6 @@ input[type="search"]::-webkit-search-cancel-button {
     row-fade-in 240ms ease-out;
 }
 
-/* Reverse of the Storage row entrance. The content rises into the clipped
- * top edge while its grid track collapses, so the following rows move upward
- * continuously and the deleted row disappears beneath the header surface. */
 @keyframes row-collapse-out {
   from {
     grid-template-rows: 1fr;
@@ -488,19 +379,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* Transitions.dev — "Texts reveal", used by the Storage dropzone's content
- * swaps (idle copy ↔ file name + status line).
- *
- * Entrance (`.is-shown` on the parent): lines rise 12px from below while
- * un-blurring, 500ms on a soft-landing bezier, staggered 40ms per line so
- * the eye lands on the first line first.
- * Exit (`.is-hiding`): a single quiet 200ms opacity fade in place — no Y
- * return, no blur, no stagger — so the disappearance never reads as a
- * reverse reveal.
- *
- * Deviations from the original snippet: custom props are scoped to
- * `.t-stagger` instead of :root, and `.t-stagger-line` doesn't force
- * `display: block` so flex-based lines (the icon disc) keep their layout. */
 .t-stagger {
   --stagger-dur: 500ms;
   --stagger-distance: 12px;
@@ -545,8 +423,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* Rolling-counter label swap: the old value lifts 5px and fades out while the
- * new one rises in from 5px below and fades in. */
 @keyframes label-out {
   from {
     transform: translateY(0);
@@ -574,8 +450,6 @@ input[type="search"]::-webkit-search-cancel-button {
   animation: label-in 220ms ease-out;
 }
 
-/* Checkbox tick: draws the stroke on like it's being ticked by hand.
- * The path sets pathLength=1 so the dash math is resolution-independent. */
 @keyframes check-draw {
   from {
     stroke-dashoffset: 1;
@@ -596,12 +470,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Chart entrance animations (AI profile template & contributions heatmap)
- * ------------------------------------------------------------------------- */
-
-/* Heatmap cells pop in softly — each cell gets a random-looking per-cell
- * animation-delay so the grid fills in a scattered order. */
 .contributions-grid {
   --contribution-tier-0: var(--color-chart-neutral);
 }
@@ -682,7 +550,6 @@ input[type="search"]::-webkit-search-cancel-button {
   animation: cell-pop 380ms ease-out both;
 }
 
-/* Bars grow up from the baseline; a per-bar delay staggers them left→right. */
 @keyframes bar-rise {
   from {
     transform: scaleY(0);
@@ -696,8 +563,6 @@ input[type="search"]::-webkit-search-cancel-button {
   animation: bar-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Line chart draws in left→right via a clip-path sweep over the whole plot
- * (line + gradient area together). */
 @keyframes chart-reveal {
   from {
     clip-path: inset(0 100% 0 0);
@@ -718,21 +583,9 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Table primitive (components/base/table)
- *
- * React Aria's collection components (Column/Row/Cell/…) can't be wrapped in
- * custom components without losing collection behaviour, so the primitive
- * re-exports them untouched and styling lives here, scoped to `.bui-table`.
- * React Aria renders real <table>/<thead>/<th>/<tr>/<td> elements.
- * --------------------------------------------------------------------------- */
 .bui-table {
   @apply w-full border-collapse text-start;
 }
-/* Header background + border-y live on the cells: with border-collapse the
- * browser doesn't paint backgrounds/borders set on the <thead> row group.
- * Backgrounds/borders are set with explicit CSS (theme vars) rather than
- * @apply, which drops border-width/bg on these row-group cells. */
 .bui-table th {
   @apply px-3 py-2.5 text-start align-middle text-body-medium text-text-tertiary whitespace-nowrap outline-none;
   background-color: var(--color-background-secondary-default);
@@ -744,9 +597,6 @@ input[type="search"]::-webkit-search-cancel-button {
   @apply px-3 py-2.5 align-middle text-body-medium text-text-primary outline-none;
   transition: padding 200ms ease, font-size 200ms ease;
 }
-/* Separators sit *between* rows only: the trailing row's boundary is drawn by
- * whatever follows the table (the container's bottom edge, or the pagination
- * footer's own border-top), so a filtered-down table never doubles up lines. */
 .bui-table tbody tr:not(:last-child) {
   border-bottom: 1px solid var(--color-separator-border);
 }
@@ -761,10 +611,6 @@ input[type="search"]::-webkit-search-cancel-button {
   @apply px-2.5 py-1.5 text-body-2-medium;
 }
 
-/* Agent Thinking (components/application/agent-thinking): the agent thinking state
- * above a chat composer. The label reuses the ai-chat-text-shimmer travel;
- * its base/highlight both derive from the tone the component sets via
- * --bui-agent-thinking-tone, so every tone shimmers consistently. */
 .bui-agent-thinking-label {
   color: transparent;
   background-image: linear-gradient(
@@ -781,8 +627,6 @@ input[type="search"]::-webkit-search-cancel-button {
   will-change: background-position;
 }
 
-/* Star sparkle: scale + fade in, settle, and vanish; per-star duration and
- * stagger come in via inline animation-duration/-delay. */
 @keyframes bui-agent-thinking-star {
   0%,
   100% {
@@ -806,8 +650,6 @@ input[type="search"]::-webkit-search-cancel-button {
   animation-iteration-count: infinite;
 }
 
-/* Infinity comet: the dash segment laps the normalized (pathLength=100)
- * figure-eight once per animation-duration. */
 @keyframes bui-agent-thinking-dash {
   to {
     stroke-dashoffset: -100;
@@ -827,7 +669,6 @@ input[type="search"]::-webkit-search-cancel-button {
     animation: none;
   }
 
-  /* Stars rest visible instead of frozen at scale(0). */
   .bui-agent-thinking-star {
     animation: none;
     transform: none;
@@ -839,8 +680,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* Star glyphs read a touch heavier than the dot grids on light backgrounds;
- * soften only them (not the label) there. Dark mode keeps the full tone. */
 .bui-agent-thinking-stars {
   color: color-mix(in oklab, currentColor 75%, transparent);
 }
@@ -849,9 +688,6 @@ input[type="search"]::-webkit-search-cancel-button {
   color: inherit;
 }
 
-/* Composer Loader (components/application/composer-loader): the light band
- * orbiting the composer while the agent works. Dash segments on a
- * pathLength-normalized SVG stroke — the offset laps once per duration. */
 @keyframes bui-composer-loader-dash {
   from {
     stroke-dashoffset: 0;
@@ -868,9 +704,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* Composer mic listening state (components/application/ai-chat): equalizer
- * bars dancing while voice input is active. Per-bar duration/delay come in
- * inline so the bars drift out of phase like real audio. */
 @keyframes bui-composer-mic-bars {
   0%,
   100% {
@@ -893,7 +726,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* Shimmer sweep on a primary call to action (the Pro prompt card). */
 @keyframes bui-badge-shimmer {
   0% {
     transform: translateX(0) skewX(-12deg);
@@ -915,9 +747,6 @@ input[type="search"]::-webkit-search-cancel-button {
     }
 }
 
-/* Progress (components/base/progress): the indeterminate bar's band of
- * light, 40% of the track wide, sweeping from fully off the start edge to
- * fully off the end. RTL runs it in reverse. */
 @keyframes bui-progress-sweep {
   from {
     translate: -100% 0;
@@ -928,13 +757,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* Skeleton (components/base/skeleton): a sheen sweeping each placeholder,
- * drawn in layers like the loaders. A crisp 2px line leads, a tight glow
- * trails it and a wide bloom trails that, all anchored to the sheen's
- * leading edge so nothing soft runs ahead of the line. The sweep takes
- * 60% of the cycle and rests off the block for the rest. RTL mirrors it.
- * Position comes from the component's classes (relative or absolute): an
- * unlayered position here would beat Tailwind's layered utilities. */
 .bui-skeleton {
   --bui-skeleton-line: rgb(255 255 255 / 0.9);
   --bui-skeleton-glow: rgb(255 255 255 / 0.55);
@@ -983,7 +805,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* No sweep under reduced motion; the block breathes instead. */
 @media (prefers-reduced-motion: reduce) {
   .bui-skeleton::after {
     display: none;
@@ -994,7 +815,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* Showcase card (docs index, landing, the starter's catalogue). */
 .landing-showcase-card {
   transition: box-shadow 280ms ease;
 }
@@ -1024,7 +844,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* KaTeX inside app text: inherit colour, keep inline formulas on the text baseline. */
 .math-text .katex {
   font-size: 1.08em;
   color: inherit;

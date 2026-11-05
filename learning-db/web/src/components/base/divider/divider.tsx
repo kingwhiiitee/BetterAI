@@ -6,13 +6,9 @@ export type DividerAlign = "start" | "center" | "end";
 
 export interface DividerProps
   extends Omit<HTMLAttributes<HTMLDivElement>, "children"> {
-  /** Single hairline, two framing hairlines, or a soft filled strip. */
   variant?: DividerVariant;
-  /** Positions the divider content while keeping the remaining line flexible. */
   align?: DividerAlign;
-  /** Text, a button, or any compact control placed in the divider. */
   children?: ReactNode;
-  /** Extra classes for the content wrapper. */
   contentClassName?: string;
   ref?: Ref<HTMLDivElement>;
 }
@@ -38,14 +34,6 @@ const styles = sortCx({
   },
 });
 
-/**
- * Horizontal content divider with three BoardUI surface treatments.
- *
- * `single` places content within one continuous hairline, `double` frames it
- * with a line above and below, and `fill` uses the secondary surface color.
- * Children stay completely composable, so labels, buttons, and small controls
- * can share the same primitive.
- */
 export function Divider({
   variant = "single",
   align = "center",
