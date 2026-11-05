@@ -78,6 +78,9 @@ export interface Course {
   id: number;
   name: string;
   status: "active" | "paused" | "done";
+  subject?: string | null;
+  /** "foundation" = shared subject base used across courses */
+  kind?: "course" | "foundation" | null;
   created_at: string;
   node_count: number;
   assessments: Assessment[];

@@ -102,7 +102,7 @@ export function CoursePage({ id }: { id: number }) {
       ) : null}
 
       <Tabs defaultSelectedKey="board">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0 flex-1">
             <TabList aria-label="视图">
               <Tab id="board" icon={RiLayoutColumnLine}>
@@ -120,7 +120,7 @@ export function CoursePage({ id }: { id: number }) {
             value={query}
             onChange={setQuery}
             clearLabel="清除"
-            className="w-full sm:w-56"
+            className="mb-1 w-full sm:w-56"
           />
         </div>
         <TabPanel id="board">

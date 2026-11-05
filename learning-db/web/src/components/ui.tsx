@@ -77,7 +77,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="py-6 text-center text-body-2-regular text-text-tertiary">{children}</p>;
+  return <p className="py-4 text-center text-body-2-regular text-text-tertiary">{children}</p>;
 }
 
 export function Loading() {
@@ -112,6 +112,15 @@ export function PageHeader({ title, sub, extra }: { title: ReactNode; sub?: Reac
         <h1 className="text-title-2-semibold text-text-primary">{title}</h1>
         {sub ? <div className="text-body-2-regular text-text-secondary">{sub}</div> : null}
       </div>
+      {extra}
+    </div>
+  );
+}
+
+export function SectionHeading({ children, extra }: { children: ReactNode; extra?: ReactNode }) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-2">
+      <h2 className="text-caption-1-medium tracking-wide text-text-tertiary">{children}</h2>
       {extra}
     </div>
   );

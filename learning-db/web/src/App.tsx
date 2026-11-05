@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import { RiBookOpenLine, RiLogoutBoxRLine, RiTaskLine, type RemixiconComponentType } from "@remixicon/react";
+import { RiBookOpenLine, RiLogoutBoxRLine, RiStackLine, RiTaskLine, type RemixiconComponentType } from "@remixicon/react";
 import { Button } from "@/components/base/buttons/button";
 import { ThemeToggle } from "@/components/application/theme/theme-toggle";
 import { DirectionProvider } from "@/components/foundations/direction/direction";
-import { getToken, setToken } from "@/lib/api";
+import { getToken, setToken, useApi, type Overview } from "@/lib/api";
 import { useRoute, href } from "@/lib/router";
 import { cx } from "@/utils/cx";
 import { TokenPage } from "@/pages/TokenPage";
-import { OverviewPage } from "@/pages/Overview";
+import { OverviewPage, groupCourses } from "@/pages/Overview";
 import { CoursePage } from "@/pages/Course";
 import { NodePage } from "@/pages/NodePage";
 import { DecisionsPage } from "@/pages/Decisions";
@@ -36,7 +36,7 @@ export default function App() {
         <TokenPage expired={hadToken} />
       ) : (
         <div className="min-h-dvh bg-background-full md:flex">
-          <aside className="sticky top-0 z-20 flex shrink-0 flex-col border-b border-separator-border bg-background-full/85 backdrop-blur md:h-dvh md:w-56 md:border-b-0 md:border-e md:bg-background-full">
+          <aside className="sticky top-0 z-20 flex shrink-0 flex-col border-b border-separator-border bg-background-full/85 backdrop-blur md:h-dvh md:w-60 md:border-b-0 md:border-e md:bg-background-full">
             <div className="flex h-14 items-center gap-2 px-4">
               <a href={href.overview} className="flex items-center gap-2 text-body-semibold text-text-primary">
                 <RiBookOpenLine className="size-5 text-foreground-icon-primary" aria-hidden />
@@ -46,14 +46,7 @@ export default function App() {
                 <AccountActions />
               </div>
             </div>
-            <nav className="flex gap-1 px-3 pb-2 md:flex-col md:pb-0 md:pt-2">
-              <NavLink to={href.overview} active={route.page !== "decisions"} icon={RiBookOpenLine}>
-                知识库
-              </NavLink>
-              <NavLink to={href.decisions} active={route.page === "decisions"} icon={RiTaskLine}>
-                待办决策
-              </NavLink>
-            </nav>
+            <SideNav route={route} />
             <div className="mt-auto hidden items-center gap-2 border-t border-separator-border p-3 md:flex">
               <AccountActions />
             </div>
@@ -67,6 +60,54 @@ export default function App() {
         </div>
       )}
     </DirectionProvider>
+  );
+}
+
+function SideNav({ route }: { route: ReturnType<typeof useRoute> }) {
+  const { data } = useApi<Overview>("/overview");
+  const openCount = data?.open_decisions.length ?? 0;
+  const activeCourse = route.page === "course" ? route.id : null;
+  return (
+    <nav aria-label="导航" className="flex min-h-0 flex-1 flex-col">
+      <div className="flex gap-1 px-3 pb-2 md:flex-col md:pb-0 md:pt-2">
+        <NavLink to={href.overview} active={route.page === "overview"} icon={RiStackLine}>
+          知识库
+        </NavLink>
+        <NavLink
+          to={href.decisions}
+          active={route.page === "decisions"}
+          icon={RiTaskLine}
+          badge={openCount ? String(openCount) : undefined}
+        >
+          待办决策
+        </NavLink>
+      </div>
+      {data?.courses.length ? (
+        <div className="hidden min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 pb-4 pt-5 md:flex">
+          {groupCourses(data.courses).map((g) => (
+            <div key={g.key} className="flex flex-col gap-0.5">
+              <span className="px-2.5 pb-1 text-caption-2-medium text-text-tertiary">{g.label}</span>
+              {g.courses.map((c) => (
+                <a
+                  key={c.id}
+                  href={href.course(c.id)}
+                  aria-current={activeCourse === c.id ? "page" : undefined}
+                  className={cx(
+                    "flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-body-2-regular outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring",
+                    activeCourse === c.id
+                      ? "bg-background-secondary-default text-text-primary"
+                      : "text-text-secondary hover:bg-background-secondary-default/60 hover:text-text-primary",
+                  )}
+                >
+                  <span className="truncate">{c.name}</span>
+                  <span className="shrink-0 text-caption-2-regular text-text-tertiary">{c.node_count}</span>
+                </a>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </nav>
   );
 }
 
@@ -91,11 +132,13 @@ function NavLink({
   to,
   active,
   icon: Icon,
+  badge,
   children,
 }: {
   to: string;
   active: boolean;
   icon: RemixiconComponentType;
+  badge?: string;
   children: string;
 }) {
   return (
@@ -108,7 +151,12 @@ function NavLink({
       )}
     >
       <Icon className="size-4 shrink-0" aria-hidden />
-      {children}
+      <span className="flex-1">{children}</span>
+      {badge ? (
+        <span className="rounded-full bg-background-tertiary-default px-1.5 text-caption-2-medium text-text-secondary">
+          {badge}
+        </span>
+      ) : null}
     </a>
   );
 }
