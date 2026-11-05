@@ -2,26 +2,25 @@
 
 给在这个仓库里干活的 agent 看的。README 写给人；这里只写改代码前必须知道、但从代码里不容易看出来的事。
 
+仓库原名 `BetterAI`，2026-11 改名 `Coach`；precise-edit 已拆到独立仓库 `kingwhiiitee/precise-edit`，这里不再有它的代码。
+
 ## 仓库里有什么
 
 | 目录 | 内容 | 运行环境 |
 | --- | --- | --- |
-| `plugins/precise-edit/` | 技能 + PreToolUse 钩子 `scripts/guard.mjs`，拦截整文件重写 | Node ≥ 18，零依赖 |
 | `plugins/adaptive-learning-coach/` | 学习教练技能（只有 `SKILL.md`，中文） | — |
 | `Latex Fix/` | ChatGPT 公式修复：userscript、转换页、CLI、技能（目录名带空格，命令里记得加引号） | 浏览器 / Node |
-| `platforms/` | 各平台可直接粘贴的指令；`platforms/codex/*` 会被 `scripts/install.mjs` 安装 | — |
-| `scripts/` | `build.mjs` 打包 `dist/`，`install.mjs` 装到本机 Codex / Claude Code | Node ≥ 18，零依赖 |
-| `tests/` | `node --test`，覆盖 guard 和 LaTeX 核心 | Node |
+| `scripts/` | `build.mjs` 打包 `dist/` | Node ≥ 18，零依赖 |
+| `tests/` | `node --test`，覆盖 LaTeX 核心 | Node |
 | `learning-db/` | 学习知识库：Cloudflare Worker（MCP + 只读 API）+ D1 + 阅览网页 | Workers / D1 |
 | `learning-db/web/` | 阅览网页源码（React 19 + Tailwind v4 + BoardUI），构建到 `learning-db/public/` | Vite |
 
 ## 常用命令
 
 ```bash
-# 仓库根目录：CI 在 Linux/macOS/Windows × Node 20/22/24 上跑这三条
+# 仓库根目录：CI 在 Linux/macOS/Windows × Node 20/22/24 上跑这两条
 npm test
 node scripts/build.mjs
-node scripts/install.mjs --all --dry-run
 
 # learning-db/
 npm ci && npm run typecheck
@@ -41,9 +40,7 @@ BASE=http://127.0.0.1:8787 TOKEN=test-token-0123456789abcdef npm run e2e
 
 **新增技能**：放在 `plugins/<name>/skills/<name>/SKILL.md` + `plugins/<name>/.claude-plugin/plugin.json`，在 `.claude-plugin/marketplace.json` 注册，在 `scripts/build.mjs` 加一行 `pack(...)`。改技能内容时同时升 `plugin.json` 和 `marketplace.json` 里的版本号。
 
-**precise-edit 的规则文本有多份**：`guard.mjs` 的 `POLICY`、`skills/precise-edit/SKILL.md`、`platforms/*` 下各平台的版本。改规则要一起改。guard 必须 fail open：自身出错时退出码 0、无输出，绝不能因为 guard 坏了而拦住正常调用。
-
-**LaTeX Fix 核心不能碰 DOM**：userscript 里的 `LatexFix` 核心会被 `node:vm`（CLI、测试）和转换页加载。`build.mjs` 会按原样匹配 `converter.html` 里的 `<script src="../userscript/chatgpt-latex-fix.user.js"></script>` 并把 userscript 内联进去，所以那一行不能改，userscript 里也不能出现 `</script`。文件开头的 `// ==UserScript==` 头是脚本管理器要读的，不是普通注释。
+**LaTeX Fix 核心不能碰 DOM**：userscript 里的 `LatexFix` 核心会被 `node:vm`（CLI、测试）和转换页加载。`build.mjs` 会按原样匹配 `converter.html` 里的 `<script src="../userscript/chatgpt-latex-fix.user.js"></script>` 并把 userscript 内联进去，所以那一行不能改，userscript 里也不能出现 `</script`。文件开头的 `// ==UserScript==` 头是脚本管理器要读的，不是普通注释。`@name` / `@namespace` 里的 `BetterAI`、`betterai-math` 类名和 `betterai-latex-fix.format` 这个 localStorage 键是旧名，故意保留：改了脚本管理器会当成另一个脚本，用户已存的设置也会丢。
 
 ## learning-db
 
@@ -69,4 +66,4 @@ npx wrangler deploy
 
 ## 注释
 
-只写下一个 agent 读代码时自己看不出来的东西：意图、不变量、坑、跨文件的约束。不要写复述代码的注释、分节标题或改动历史。功能性的注释要保留：`// ==UserScript==` 头、`@ts-` / lint 指令、Markdown 里的 `<!-- boardui:rules -->` 和 `<!-- BEGIN precise-edit -->` 标记（`install.mjs` 靠它们定位要替换的块）。
+只写下一个 agent 读代码时自己看不出来的东西：意图、不变量、坑、跨文件的约束。不要写复述代码的注释、分节标题或改动历史。功能性的注释要保留：`// ==UserScript==` 头、`@ts-` / lint 指令、Markdown 里的 `<!-- boardui:rules -->` 标记。

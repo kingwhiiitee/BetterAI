@@ -61,7 +61,7 @@ Open [`chatgpt/custom-instructions.md`](chatgpt/custom-instructions.md) and past
 
 #### 2. Skill (optional)
 
-Download `latex-fix-skill.zip` from [Releases](https://github.com/kingwhiiitee/BetterAI/releases/latest), or zip the [`skills/latex-fix`](skills/latex-fix) folder yourself.
+Download `latex-fix-skill.zip` from [Releases](https://github.com/kingwhiiitee/Coach/releases/latest), or zip the [`skills/latex-fix`](skills/latex-fix) folder yourself.
 
 - ChatGPT Work / Business / Enterprise / Edu: Skills → Create → Upload from your computer.
 - Claude.ai: Settings → Capabilities → Skills → Upload skill.
@@ -69,7 +69,7 @@ Download `latex-fix-skill.zip` from [Releases](https://github.com/kingwhiiitee/B
 #### 3. Userscript (desktop browser)
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/). In Chrome / Edge, also turn on "Allow user scripts" (or Developer mode) for the extension.
-2. Open the [raw userscript](https://raw.githubusercontent.com/kingwhiiitee/BetterAI/main/Latex%20Fix/userscript/chatgpt-latex-fix.user.js) and click **Install**.
+2. Open the [raw userscript](https://raw.githubusercontent.com/kingwhiiitee/Coach/main/Latex%20Fix/userscript/chatgpt-latex-fix.user.js) and click **Install**.
 3. Reload chatgpt.com.
 
 It loads KaTeX 0.16.11 from cdnjs with a pinned SHA-256 hash and needs no extra permissions (`@grant none`).
@@ -91,8 +91,8 @@ Remove the key to go back to `$`.
 
 #### 4. Converter page (any device)
 
-- Open `latex-fix-converter.html` from [Releases](https://github.com/kingwhiiitee/BetterAI/releases/latest) or build it with `node scripts/build.mjs` (it lands in `dist/`). It is one self-contained file and works offline.
-- Or host it: with GitHub Pages enabled for your fork (Settings → Pages → Deploy from branch `main`, folder `/`), it is served at `https://<user>.github.io/BetterAI/Latex%20Fix/web/converter.html`. Add it to your phone's home screen.
+- Open `latex-fix-converter.html` from [Releases](https://github.com/kingwhiiitee/Coach/releases/latest) or build it with `node scripts/build.mjs` (it lands in `dist/`). It is one self-contained file and works offline.
+- Or host it: with GitHub Pages enabled for your fork (Settings → Pages → Deploy from branch `main`, folder `/`), it is served at `https://<user>.github.io/Coach/Latex%20Fix/web/converter.html`. Add it to your phone's home screen.
 
 Nothing is uploaded; the conversion runs in the page.
 
@@ -190,7 +190,7 @@ LaTeX 规则从源头解决问题(模型怎么写),并在所有客户端提供�
 
 #### 2. Skill(可选)
 
-从 [Releases](https://github.com/kingwhiiitee/BetterAI/releases/latest) 下载 `latex-fix-skill.zip`,或者自己把 [`skills/latex-fix`](skills/latex-fix) 文件夹打包成 zip。
+从 [Releases](https://github.com/kingwhiiitee/Coach/releases/latest) 下载 `latex-fix-skill.zip`,或者自己把 [`skills/latex-fix`](skills/latex-fix) 文件夹打包成 zip。
 
 - ChatGPT Work / Business / Enterprise / Edu:Skills → Create → Upload from your computer。
 - Claude.ai:设置 → Capabilities → Skills → Upload skill。
@@ -198,7 +198,7 @@ LaTeX 规则从源头解决问题(模型怎么写),并在所有客户端提供�
 #### 3. 油猴脚本(桌面浏览器)
 
 1. 安装 [Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/)。在 Chrome / Edge 中还需要为该扩展打开"允许用户脚本"(或开发者模式)。
-2. 打开 [脚本原始文件](https://raw.githubusercontent.com/kingwhiiitee/BetterAI/main/Latex%20Fix/userscript/chatgpt-latex-fix.user.js),点击 **安装**。
+2. 打开 [脚本原始文件](https://raw.githubusercontent.com/kingwhiiitee/Coach/main/Latex%20Fix/userscript/chatgpt-latex-fix.user.js),点击 **安装**。
 3. 刷新 chatgpt.com。
 
 脚本从 cdnjs 加载 KaTeX 0.16.11,并用固定的 SHA-256 校验;不需要任何额外权限(`@grant none`)。
@@ -220,8 +220,8 @@ localStorage.setItem('betterai-latex-fix.format', 'bracket')
 
 #### 4. 转换网页(任何设备)
 
-- 从 [Releases](https://github.com/kingwhiiitee/BetterAI/releases/latest) 下载 `latex-fix-converter.html`,或运行 `node scripts/build.mjs` 生成(位于 `dist/`)。它是单个独立文件,离线也能用。
-- 也可以托管:在你的 fork 中开启 GitHub Pages(Settings → Pages → Deploy from branch `main`,目录 `/`),地址为 `https://<用户名>.github.io/BetterAI/Latex%20Fix/web/converter.html`,可以添加到手机主屏幕。
+- 从 [Releases](https://github.com/kingwhiiitee/Coach/releases/latest) 下载 `latex-fix-converter.html`,或运行 `node scripts/build.mjs` 生成(位于 `dist/`)。它是单个独立文件,离线也能用。
+- 也可以托管:在你的 fork 中开启 GitHub Pages(Settings → Pages → Deploy from branch `main`,目录 `/`),地址为 `https://<用户名>.github.io/Coach/Latex%20Fix/web/converter.html`,可以添加到手机主屏幕。
 
 所有转换都在网页内完成,不会上传任何内容。
 

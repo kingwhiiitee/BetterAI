@@ -89,4 +89,4 @@ Put the converted text in a single code block so the user can copy it without th
 4. Balance braces, `\left` / `\right` and environments.
 5. Return the fixed formula in the destination format from the table above.
 
-For repeat fixing on chatgpt.com, point the user to the BetterAI userscript `Latex Fix/userscript/chatgpt-latex-fix.user.js`: it renders formulas left as raw text and copies answers with `$...$` math.
+For repeat fixing on chatgpt.com, point the user to the Coach repo userscript `Latex Fix/userscript/chatgpt-latex-fix.user.js`: it renders formulas left as raw text and copies answers with `$...$` math.

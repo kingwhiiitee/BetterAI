@@ -1,23 +1,20 @@
 {
-  "name": "betterai",
+  "name": "coach",
   "version": "1.0.0",
   "private": true,
-  "description": "Portable fixes for AI assistants. precise-edit: make Claude, Claude Code, Codex and ChatGPT use exact-match edits instead of rewriting whole files. LaTeX Fix: make ChatGPT formulas render and copy correctly.",
+  "description": "Adaptive AI study coach with a cross-session knowledge base (learning-db), plus LaTeX Fix: make ChatGPT formulas render and copy correctly.",
   "type": "module",
   "license": "MIT",
   "author": "WH1T3K1NG",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kingwhiiitee/BetterAI.git"
+    "url": "git+https://github.com/kingwhiiitee/Coach.git"
   },
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "test": "node --test",
-    "build": "node scripts/build.mjs",
-    "install:codex": "node scripts/install.mjs --codex",
-    "install:claude-code": "node scripts/install.mjs --claude-code",
-    "uninstall:all": "node scripts/install.mjs --all --uninstall"
+    "build": "node scripts/build.mjs"
   }
 }

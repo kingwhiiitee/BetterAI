@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Builds dist/ (skill zips, the .plugin, the userscript, the self-contained converter page).
+// Builds dist/ (skill zips, the userscript, the self-contained converter page).
 // No dependencies and reproducible bytes: entries are sorted and timestamps fixed, so do not add
 // anything time- or machine-dependent. New skills need a pack() line here.
 //
@@ -10,7 +10,6 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PLUGIN = path.join(REPO, 'plugins', 'precise-edit');
 const LATEX = path.join(REPO, 'Latex Fix');
 const DIST = path.join(REPO, 'dist');
 
@@ -98,8 +97,6 @@ function pack(dir, prefix, out) {
 }
 
 fs.mkdirSync(DIST, { recursive: true });
-pack(path.join(PLUGIN, 'skills', 'precise-edit'), 'precise-edit/', path.join(DIST, 'precise-edit-skill.zip'));
-pack(PLUGIN, '', path.join(DIST, 'precise-edit.plugin'));
 pack(path.join(LATEX, 'skills', 'latex-fix'), 'latex-fix/', path.join(DIST, 'latex-fix-skill.zip'));
 pack(path.join(REPO, 'plugins', 'adaptive-learning-coach', 'skills', 'adaptive-learning-coach'), 'adaptive-learning-coach/', path.join(DIST, 'adaptive-learning-coach-skill.zip'));
 

@@ -5,8 +5,8 @@
 // @description  Render formulas ChatGPT left as raw LaTeX, and copy answers with $…$ / $$…$$ math that works in Obsidian, Typora, Notion, Jupyter and GitHub.
 // @author       WH1T3K1NG
 // @license      MIT
-// @homepageURL  https://github.com/kingwhiiitee/BetterAI/tree/main/Latex%20Fix
-// @supportURL   https://github.com/kingwhiiitee/BetterAI/issues
+// @homepageURL  https://github.com/kingwhiiitee/Coach/tree/main/Latex%20Fix
+// @supportURL   https://github.com/kingwhiiitee/Coach/issues
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js#sha256=e6bfe5deebd4c7ccd272055bab63bd3ab2c73b907b6e6a22d352740a81381fd4
