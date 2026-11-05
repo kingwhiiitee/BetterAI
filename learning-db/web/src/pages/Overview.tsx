@@ -4,7 +4,7 @@ import { useApi, type Course, type Overview as OverviewData } from "@/lib/api";
 import { LEVEL, LEVELS, COURSE_STATUS, ASSESSMENT_STATUS, daysUntil, fmtTime } from "@/lib/labels";
 import { MathText } from "@/components/math-text";
 import { href } from "@/lib/router";
-import { Card, CardTitle, Empty, ErrorCard, Loading, PageHeader, SectionHeading } from "@/components/ui";
+import { Card, CardTitle, Empty, ErrorCard, Loading, PageHeader } from "@/components/ui";
 import { DecisionList } from "./Decisions";
 
 export function OverviewPage() {
@@ -20,18 +20,9 @@ export function OverviewPage() {
           <Empty>还没有课程。和 AI 学习时，它会通过 MCP 工具自动建课、建节点。</Empty>
         </Card>
       ) : (
-        <div className="flex flex-col gap-8">
-          {groupCourses(data.courses).map((g) => (
-            <section key={g.key}>
-              <SectionHeading>
-                {g.label} · {g.courses.length}
-              </SectionHeading>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {g.courses.map((c) => (
-                  <CourseCard key={c.id} course={c} />
-                ))}
-              </div>
-            </section>
+        <div className="grid gap-4 md:grid-cols-2">
+          {data.courses.map((c) => (
+            <CourseCard key={c.id} course={c} />
           ))}
         </div>
       )}
@@ -157,11 +148,3 @@ export const LEVEL_BAR: Record<string, string> = {
   weak: "bg-status-rose-text",
   recheck: "bg-status-orange-text",
 };
-
-export function groupCourses(courses: Course[]) {
-  const groups = [
-    { key: "course", label: "课程", courses: courses.filter((c) => c.kind !== "foundation") },
-    { key: "foundation", label: "基础知识", courses: courses.filter((c) => c.kind === "foundation") },
-  ];
-  return groups.filter((g) => g.courses.length);
-}

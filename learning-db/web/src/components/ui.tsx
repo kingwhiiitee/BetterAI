@@ -114,12 +114,3 @@ export function PageHeader({ title, sub, extra }: { title: ReactNode; sub?: Reac
     </div>
   );
 }
-
-export function SectionHeading({ children, extra }: { children: ReactNode; extra?: ReactNode }) {
-  return (
-    <div className="mb-3 flex items-center justify-between gap-2">
-      <h2 className="text-caption-1-medium tracking-wide text-text-tertiary">{children}</h2>
-      {extra}
-    </div>
-  );
-}

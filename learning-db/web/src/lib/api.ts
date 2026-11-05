@@ -77,8 +77,6 @@ export interface Course {
   id: number;
   name: string;
   status: "active" | "paused" | "done";
-  subject?: string | null;
-  kind?: "course" | "foundation" | null;
   created_at: string;
   node_count: number;
   assessments: Assessment[];
