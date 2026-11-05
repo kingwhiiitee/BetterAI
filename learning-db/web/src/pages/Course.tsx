@@ -362,9 +362,6 @@ function KnowledgeMap({
               );
             })}
           </div>
-          <p className="mt-4 text-caption-1-regular text-text-tertiary">
-            从左到右按前置顺序排列，左侧色条是当前状态。悬停某个知识点会高亮它的整条前置链。粗线：必需前置；细线：重要；虚线：辅助。
-          </p>
         </div>
       )}
     </Card>
