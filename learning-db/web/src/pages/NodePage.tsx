@@ -51,7 +51,7 @@ export function NodePage({ id }: { id: number }) {
   return (
     <>
       <Breadcrumb className="mb-3">
-        <BreadcrumbItem href={href.overview}>我的课程</BreadcrumbItem>
+        <BreadcrumbItem href={href.overview}>知识库</BreadcrumbItem>
         <BreadcrumbItem href={href.course(node.course_id)}>{course.data?.course.name ?? "课程"}</BreadcrumbItem>
         <BreadcrumbItem current>
           <MathText>{node.title}</MathText>

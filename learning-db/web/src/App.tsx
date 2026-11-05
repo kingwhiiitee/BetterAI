@@ -44,7 +44,7 @@ export default function App() {
               </a>
               <nav className="flex items-center gap-1">
                 <NavLink to={href.overview} active={route.page !== "decisions"}>
-                  课程
+                  知识库
                 </NavLink>
                 <NavLink to={href.decisions} active={route.page === "decisions"}>
                   待办决策

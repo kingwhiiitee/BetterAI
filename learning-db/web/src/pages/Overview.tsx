@@ -14,7 +14,7 @@ export function OverviewPage() {
 
   return (
     <>
-      <PageHeader title="我的课程" sub={`${data.courses.length} 门课 · ${data.open_decisions.length} 条待办决策`} />
+      <PageHeader title="知识库" sub={`${data.courses.length} 门课 · ${data.open_decisions.length} 条待办决策`} />
       {data.courses.length === 0 ? (
         <Card>
           <Empty>还没有课程。和 AI 学习时，它会通过 MCP 工具自动建课、建节点。</Empty>

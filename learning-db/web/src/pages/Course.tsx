@@ -53,7 +53,7 @@ export function CoursePage({ id }: { id: number }) {
   return (
     <>
       <Breadcrumb className="mb-3">
-        <BreadcrumbItem href={href.overview}>我的课程</BreadcrumbItem>
+        <BreadcrumbItem href={href.overview}>知识库</BreadcrumbItem>
         <BreadcrumbItem current>{data.course.name}</BreadcrumbItem>
       </Breadcrumb>
       <PageHeader
