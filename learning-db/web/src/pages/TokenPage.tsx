@@ -35,7 +35,7 @@ export function TokenPage({ expired }: { expired?: boolean }) {
           <span className="flex size-10 items-center justify-center rounded-xl bg-background-secondary-default">
             <RiBookOpenLine className="size-5 text-foreground-icon-primary" aria-hidden />
           </span>
-          <h1 className="text-title-3-semibold text-text-primary">学习知识库</h1>
+          <h1 className="text-title-3-semibold text-text-primary">Coach</h1>
           <p className="text-body-2-regular text-text-secondary">
             输入部署 Worker 时设置的 ACCESS_TOKEN。令牌只保存在这台设备的浏览器里。
           </p>

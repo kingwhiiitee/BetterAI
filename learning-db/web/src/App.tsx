@@ -41,7 +41,7 @@ export default function App() {
             <div className="flex h-14 items-center gap-2 px-4">
               <a href={href.dashboard} className="flex items-center gap-2 text-body-semibold text-text-primary">
                 <RiBookOpenLine className="size-5 text-foreground-icon-primary" aria-hidden />
-                <span>学习知识库</span>
+                <span>Coach</span>
               </a>
               <div className="ms-auto flex items-center gap-2 md:hidden">
                 <AccountActions />
