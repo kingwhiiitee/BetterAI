@@ -14,7 +14,7 @@ export function DecisionsPage() {
   const active = data.open_decisions.filter((d) => d.status === "active");
   return (
     <>
-      <PageHeader title="待办决策" sub="AI 根据证据定下的下一步，以及仍在生效的学 / 略读 / 跳过范围决定" />
+      <PageHeader title="待办决策" />
       <div className="flex flex-col gap-4">
         <Card>
           <h2 className="mb-3 text-headline-semibold text-text-primary">待执行 · {planned.length}</h2>
