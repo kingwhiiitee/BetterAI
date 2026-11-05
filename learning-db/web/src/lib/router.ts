@@ -4,7 +4,8 @@ export type Route =
   | { page: "overview" }
   | { page: "course"; id: number }
   | { page: "node"; id: number }
-  | { page: "decisions" };
+  | { page: "decisions" }
+  | { page: "dashboard" };
 
 // Hash routing, so the Worker's SPA fallback never has to know about client routes.
 function parse(hash: string): Route {
@@ -12,6 +13,7 @@ function parse(hash: string): Route {
   if (parts[0] === "course" && parts[1]) return { page: "course", id: Number(parts[1]) };
   if (parts[0] === "node" && parts[1]) return { page: "node", id: Number(parts[1]) };
   if (parts[0] === "decisions") return { page: "decisions" };
+  if (parts[0] === "dashboard") return { page: "dashboard" };
   return { page: "overview" };
 }
 
@@ -33,4 +35,5 @@ export const href = {
   course: (id: number) => `#/course/${id}`,
   node: (id: number) => `#/node/${id}`,
   decisions: "#/decisions",
+  dashboard: "#/dashboard",
 };

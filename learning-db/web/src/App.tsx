@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RiBookOpenLine, RiLogoutBoxRLine, RiTaskLine, type RemixiconComponentType } from "@remixicon/react";
+import { RiBookOpenLine, RiDashboardLine, RiLogoutBoxRLine, RiTaskLine, type RemixiconComponentType } from "@remixicon/react";
 import { Button } from "@/components/base/buttons/button";
 import { ThemeToggle } from "@/components/application/theme/theme-toggle";
 import { DirectionProvider } from "@/components/foundations/direction/direction";
@@ -11,6 +11,7 @@ import { OverviewPage } from "@/pages/Overview";
 import { CoursePage } from "@/pages/Course";
 import { NodePage } from "@/pages/NodePage";
 import { DecisionsPage } from "@/pages/Decisions";
+import { DashboardPage } from "@/pages/Dashboard";
 
 function useToken() {
   const [token, set] = useState(getToken);
@@ -47,7 +48,14 @@ export default function App() {
               </div>
             </div>
             <nav className="flex gap-1 px-3 pb-2 md:flex-col md:pb-0 md:pt-2">
-              <NavLink to={href.overview} active={route.page !== "decisions"} icon={RiBookOpenLine}>
+              <NavLink to={href.dashboard} active={route.page === "dashboard"} icon={RiDashboardLine}>
+                仪表盘
+              </NavLink>
+              <NavLink
+                to={href.overview}
+                active={route.page === "overview" || route.page === "course" || route.page === "node"}
+                icon={RiBookOpenLine}
+              >
                 知识库
               </NavLink>
               <NavLink to={href.decisions} active={route.page === "decisions"} icon={RiTaskLine}>
@@ -61,6 +69,7 @@ export default function App() {
           <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-6 pb-16 md:px-8">
             {route.page === "overview" && <OverviewPage />}
             {route.page === "decisions" && <DecisionsPage />}
+            {route.page === "dashboard" && <DashboardPage />}
             {route.page === "course" && <CoursePage key={route.id} id={route.id} />}
             {route.page === "node" && <NodePage key={route.id} id={route.id} />}
           </main>
