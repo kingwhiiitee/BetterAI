@@ -118,7 +118,7 @@ function NavLink({
       href={to}
       aria-current={active ? "page" : undefined}
       className={cx(
-        "flex h-12 items-center gap-2 rounded-lg px-2.5 text-body-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring",
+        "flex h-10 items-center gap-2 rounded-lg px-2.5 text-body-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring",
         active ? "bg-background-secondary-default text-text-primary" : "text-text-secondary hover:bg-background-secondary-default/60 hover:text-text-primary",
       )}
     >
