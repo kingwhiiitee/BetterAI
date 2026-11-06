@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { RiBookOpenLine, RiDashboardLine, RiLogoutBoxRLine, RiTaskLine, type RemixiconComponentType } from "@remixicon/react";
 import { Button } from "@/components/base/buttons/button";
 import { ThemeToggle } from "@/components/application/theme/theme-toggle";
@@ -6,6 +6,8 @@ import { DirectionProvider } from "@/components/foundations/direction/direction"
 import { getToken, setToken } from "@/lib/api";
 import { useRoute, href } from "@/lib/router";
 import { cx } from "@/utils/cx";
+import { useSidebarWidth } from "@/lib/sidebar-width";
+import { ResizeHandle } from "@/components/resize-handle";
 import { TokenPage } from "@/pages/TokenPage";
 import { OverviewPage } from "@/pages/Overview";
 import { CoursePage } from "@/pages/Course";
@@ -26,6 +28,7 @@ function useToken() {
 export default function App() {
   const token = useToken();
   const route = useRoute();
+  const [sidebarWidth, setSidebarWidth] = useSidebarWidth();
   const [hadToken, setHadToken] = useState(!!token);
   useEffect(() => {
     if (token) setHadToken(true);
@@ -37,7 +40,10 @@ export default function App() {
         <TokenPage expired={hadToken} />
       ) : (
         <div className="min-h-dvh bg-background-full md:flex">
-          <aside className="sticky top-0 z-20 flex shrink-0 flex-col border-b border-separator-border bg-background-full/85 backdrop-blur md:h-dvh md:w-65 md:border-b-0 md:border-e md:bg-background-full">
+          <aside
+            style={{ "--sidebar-w": `${sidebarWidth}px` } as CSSProperties}
+            className="sticky top-0 z-20 flex shrink-0 flex-col border-b border-separator-border bg-background-full/85 backdrop-blur md:h-dvh md:w-(--sidebar-w) md:border-b-0 md:border-e md:bg-background-full">
+            <ResizeHandle width={sidebarWidth} onResize={setSidebarWidth} />
             <div className="flex h-14 items-center gap-2 px-4">
               <a href={href.dashboard} className="flex items-center gap-2 text-body-semibold text-text-primary">
                 <RiBookOpenLine className="size-5 text-foreground-icon-primary" aria-hidden />
