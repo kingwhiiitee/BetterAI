@@ -43,7 +43,7 @@ export function ResizeHandle({ width, onResize }: { width: number; onResize: (w:
       onKeyDown={onKeyDown}
       onDoubleClick={() => onResize(SIDEBAR_DEFAULT)}
       title="拖动调整宽度，双击恢复默认"
-      className="absolute inset-y-0 -end-1 z-30 hidden w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:start-1/2 after:w-px after:-translate-x-1/2 after:transition-colors hover:after:bg-border-focus-ring focus-visible:after:bg-border-focus-ring md:block"
+      className="absolute inset-y-0 -end-1 z-30 hidden w-2 cursor-col-resize touch-none outline-none md:block"
     />
   );
 }
