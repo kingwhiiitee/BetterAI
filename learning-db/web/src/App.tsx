@@ -53,7 +53,7 @@ export default function App() {
                 <AccountActions />
               </div>
             </div>
-            <nav className="flex gap-1 px-3 pb-2 md:flex-col md:pb-0 md:pt-2">
+            <nav className="flex gap-2 px-4 pb-2 md:flex-col md:pb-0 md:pt-2">
               <NavLink to={href.dashboard} active={route.page === "dashboard"} icon={RiDashboardLine}>
                 仪表盘
               </NavLink>
@@ -118,7 +118,7 @@ function NavLink({
       href={to}
       aria-current={active ? "page" : undefined}
       className={cx(
-        "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-body-2-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring",
+        "flex h-12 items-center gap-2 rounded-lg px-2.5 text-body-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring",
         active ? "bg-background-secondary-default text-text-primary" : "text-text-secondary hover:bg-background-secondary-default/60 hover:text-text-primary",
       )}
     >
